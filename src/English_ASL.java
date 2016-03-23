@@ -54,11 +54,8 @@ public class English_ASL extends HttpServlet {
 		for (char ch = 'a'; ch <= 'z'; ch++)
 			signList.add(((int) ch - 'a'), MySQLHelper.getAllSigns(Sign.TABLE_NAME.replace('*', ch)));
 
-		response.getWriter().append("Served at:").append(request.getContextPath()); // set
-																					// up
-																					// optional
-																					// output
-																					// files
+		response.getWriter().append("Served at:").append(request.getContextPath());
+
 		PrintWriter out;
 
 		out = new PrintWriter(System.out);
@@ -181,145 +178,165 @@ public class English_ASL extends HttpServlet {
 		}
 	}
 
-	ArrayList<Sign> getSignsFromPage(char from, char to) {
-		ArrayList<Sign> list = new ArrayList<Sign>();
+	/**
+	 * getSignsFromPage
+	 * 
+	 * Load all Signs from the web page after parsing data.
+	 * 
+	 * @param from
+	 * @param to
+	 * @return
+	 */
+	List<List<Sign>> getSignsFromPage(char from, char to) {
+		// Creates a database and loads array for character range input
+		List<List<Sign>> signList = new ArrayList<List<Sign>>();
 		for (char ch = from; ch <= to; ch++) {
 
-			String signDictionaryBrowseURL = "https://www.signingsavvy.com/browse/" + ch;
-			org.jsoup.nodes.Document browseDoc = null;
-			Elements browse = null;
-			try {
-				browseDoc = Jsoup.connect(signDictionaryBrowseURL).get();
-				browse = browseDoc.getElementsByClass("search_results");
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			MySQLHelper.dropTable(ch + "Sign");
+			MySQLHelper.createTable(ch);
 
-			if (browse != null) {
-				for (Node value : browse.get(0).getElementsByTag("li")) {
-					String signUrl = "";
-					String signText = "";
-					String connotation = "";
-					int startCut, endCut;
-					startCut = value.toString().indexOf("href");
-					signUrl = value.toString().substring(startCut + 6);
-					endCut = signUrl.indexOf("\">");
-					signText = signUrl.substring(1);
-					if (endCut != -1) {
-						int endTag = signUrl.indexOf("</a>");
-						signText = signUrl.substring(endCut + 2, endTag);
-						signUrl = "https://www.signingsavvy.com/" + signUrl.substring(0, endCut);
-					}
+			String listUrl = "https://www.signingsavvy.com/browse/" + ch;
+			Elements signElements = getSignElements(listUrl);
+			ArrayList<Sign> list = new ArrayList<>();
 
-					org.jsoup.nodes.Document doc = null;
-					Elements div = null;
-					try {
-						doc = Jsoup.connect(signUrl).get();
-						div = doc.getElementsByClass("signing_body");
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
+			// if the list of ELements is not null
+			if (signElements != null) {
+				// Get the List Items that represent the Signs from the
+				// collection of Elements
+				for (Node value : signElements.get(0).getElementsByTag("li")) {
+					// Add the Signs as they are to the list
+					// ***The Signs in this list are not fully initialized yet.
+					list.add(getSignFromNode(value));
+				}
 
-					if (div != null) {
-						if (div.toString().contains("<source src=")) {
-							int indexOfVideo = div.toString().indexOf("<source src=");
-							String garble = div.toString().substring(indexOfVideo);
-							int indexOfEnd = garble.indexOf(".mp4");
-							String videoUrl = "https://www.signingsavvy.com/" + garble.substring(13, indexOfEnd + 4);
-							Sign sign = new Sign();
-							sign.setLemmaValue(signText);
-							sign.setVideoUrl(videoUrl);
-							sign.setPageUrl(signUrl);
-							sign.setConnotation(connotation);
-							list.add(sign);
-						}
-					}
+				// Get the Urls for the Videos
+				for (Sign sgn : list) {
+					sgn = getVideoUrlFromSignPage(sgn);
 				}
 			}
 
+			MySQLHelper.insert(list, ch + "Sign");
+			signList.add(list);
 		}
-		return list;
+
+		return signList;
 	}
 
 	// Creates a database and loads array for character range input
-	void createInitialDatabase(char from, char to) {
+	public void createInitialDatabase(char from, char to) {
 
 		for (char ch = from; ch <= to; ch++) {
 
 			MySQLHelper.dropTable(ch + "Sign");
 			MySQLHelper.createTable(ch);
 
-			String signDictionaryBrowseURL = "https://www.signingsavvy.com/browse/" + ch;
-			org.jsoup.nodes.Document browseDoc = null;
-			Elements browse = null;
-			try {
-				browseDoc = Jsoup.connect(signDictionaryBrowseURL).get();
-				browse = browseDoc.getElementsByClass("search_results");
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			String listUrl = "https://www.signingsavvy.com/browse/" + ch;
+			Elements signElements = getSignElements(listUrl);
+			ArrayList<Sign> list = new ArrayList<>();
 
-			if (browse != null) {
-				for (Node value : browse.get(0).getElementsByTag("li")) {
-					String signUrl = "";
-					String connotation = "";
-					String signText = "";
-					int startCut, endCut;
-					startCut = value.toString().indexOf("href");
-					signUrl = value.toString().substring(startCut + 6);
-					endCut = signUrl.indexOf("\">");
-					signText = signUrl.substring(1);
-					if (endCut != -1) {
-						int endTag = signUrl.indexOf("</a>");
-						signText = signUrl.substring(endCut + 2, endTag);
-						int connotation_tag = signUrl.indexOf("</li>");
+			// if the list of ELements is not null
+			if (signElements != null) {
+				// Get the List Items that represent the Signs from the
+				// collection of Elements
+				for (Node value : signElements.get(0).getElementsByTag("li")) {
+					// Add the Signs as they are to the list
+					// ***The Signs in this list are not fully initialized yet.
+					list.add(getSignFromNode(value));
+				}
 
-						if (connotation_tag - 2 - (endTag + 5) > 0) {
-							connotation = signUrl.substring(endTag + 5, connotation_tag - 2).toString()
-									.replace("(as in &amp;quot", "").replace("</a>", "").replace("/a>", "")
-									.replace(">", "").trim();
-
-						} else
-							connotation = "";
-						signUrl = "https://www.signingsavvy.com/" + signUrl.substring(0, endCut);
-
-					}
-
-					org.jsoup.nodes.Document doc = null;
-					Elements div = null;
-					try {
-						doc = Jsoup.connect(signUrl).get();
-						div = doc.getElementsByClass("signing_body");
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-
-					if (div != null) {
-						if (div.toString().contains("<source src=")) {
-							int indexOfVideo = div.toString().indexOf("<source src=");
-							String garble = div.toString().substring(indexOfVideo);
-							int indexOfEnd = garble.indexOf(".mp4");
-							String videoUrl = "https://www.signingsavvy.com/" + garble.substring(13, indexOfEnd + 4);
-							Sign sign = new Sign();
-							sign.setLemmaValue(signText);
-							sign.setVideoUrl(videoUrl);
-							sign.setPageUrl(signUrl);
-							sign.setConnotation(connotation);
-							MySQLHelper.insert(sign, ch + "Sign");
-						}
-					}
+				// Get the Urls for the Videos
+				for (Sign sgn : list) {
+					sgn = getVideoUrlFromSignPage(sgn);
 				}
 			}
 
+			MySQLHelper.insert(list, ch + "Sign");
+
 		}
+
 		return;
 	}
 
-	Sign getSignIfExist(String strVal) {
+	public Sign getVideoUrlFromSignPage(Sign sgn) {
+		org.jsoup.nodes.Document doc = null;
+		Elements div = null;
+		try {
+			doc = Jsoup.connect(sgn.getPageUrl()).get();
+			div = doc.getElementsByClass("signing_body");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		if (div != null) {
+			if (div.toString().contains("<source src=")) {
+				int indexOfVideo = div.toString().indexOf("<source src=");
+				String garble = div.toString().substring(indexOfVideo);
+				int indexOfEnd = garble.indexOf(".mp4");
+				String videoUrl = "https://www.signingsavvy.com/" + garble.substring(13, indexOfEnd + 4);
+				Sign sign = new Sign();
+				sign.setVideoUrl(videoUrl);
+			}
+		}
+		return sgn;
+	}
+
+	/**
+	 * Returns a Sign that containts PageUrl, Connotation and Lemma Values from
+	 * a given Node
+	 * 
+	 * @param value
+	 * @return
+	 */
+	public Sign getSignFromNode(Node value) {
+		Sign newSign = new Sign();
+		String signUrl = "";
+		String connotation = "";
+		String signText = "";
+
+		int startCut, endCut;
+
+		startCut = value.toString().indexOf("href");
+		signUrl = value.toString().substring(startCut + 6);
+		endCut = signUrl.indexOf("\">");
+		signText = signUrl.substring(1);
+
+		if (endCut != -1) {
+			int endTag = signUrl.indexOf("</a>");
+			signText = signUrl.substring(endCut + 2, endTag);
+			int connotation_tag = signUrl.indexOf("</li>");
+
+			// @TODO: See about the need for the replace statements
+			if (connotation_tag - 2 - (endTag + 5) > 0) {
+				connotation = signUrl.substring(endTag + 5, connotation_tag - 2).toString()
+						.replace("(as in &amp;quot", "").replace("</a>", "").replace("/a>", "").replace(">", "").trim();
+
+			} else
+				connotation = "";
+			signUrl = "https://www.signingsavvy.com/" + signUrl.substring(0, endCut);
+
+		}
+
+		newSign.setConnotation(connotation);
+		newSign.setPageUrl(signUrl);
+		newSign.setLemmaValue(signText);
+		return newSign;
+	}
+
+	public Elements getSignElements(String browsePageUrl) {
+		org.jsoup.nodes.Document resultPage = null;
+		Elements browse = null;
+		try {
+			resultPage = Jsoup.connect(browsePageUrl).get();
+			browse = resultPage.getElementsByClass("search_results");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return browse;
+	}
+
+	public Sign getSignIfExist(String strVal) {
 
 		char firstCh = strVal.toLowerCase().charAt(0);
 		int firstChAsInt = ((int) firstCh - 'a');
