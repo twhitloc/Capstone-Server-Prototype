@@ -122,13 +122,15 @@ public class MySQLHelper {
 
 					String textVal = "", signUrl = "", vidUrl = "", connotation = "";
 
-					textVal = sign.getLemmaValue();
-					signUrl = sign.getPageUrl();
-					vidUrl = sign.getVideoUrl();
-					connotation = sign.getConnotation();
+					// If the sign contains an apostrophe then it cannot be
+					// inserted. Replace during DB Operations
+					textVal = sign.getLemmaValue().replace("'", "_");
+					signUrl = sign.getPageUrl().replace("'", "_");
+					vidUrl = sign.getVideoUrl().replace("'", "_");
+					connotation = sign.getConnotation().replace("'", "_");
 
-					String sql = "INSERT INTO " + table + " " + "VALUES ('" + textVal + "', '" + signUrl + "', '"
-							+ vidUrl + "')";
+					String sql = "INSERT INTO" + " " + table + " " + "VALUES ('" + textVal.replace("'", "_") + "', '"
+							+ vidUrl + "', '" + signUrl + "', '" + connotation + "')";
 					stmt.executeUpdate(sql);
 					System.out.println("Executed query : " + sql + "\n");
 				} catch (SQLException se) {
@@ -177,13 +179,15 @@ public class MySQLHelper {
 
 			String textVal = "", signUrl = "", vidUrl = "", connotation = "";
 
-			textVal = sign.getLemmaValue();
-			signUrl = sign.getPageUrl();
-			vidUrl = sign.getVideoUrl();
-			connotation = sign.getConnotation();
+			// If the sign contains an apostrophe then it cannot be inserted.
+			// Replace during DB Operations
+			textVal = sign.getLemmaValue().replace("'", "_");
+			signUrl = sign.getPageUrl().replace("'", "_");
+			vidUrl = sign.getVideoUrl().replace("'", "_");
+			connotation = sign.getConnotation().replace("'", "_");
 
 			String sql = "INSERT INTO" + " " + table + " " + "VALUES ('" + textVal.replace("'", "_") + "', '" + vidUrl
-					+ "', '" + signUrl + "', '" + connotation.replace("'", "_") + "')";
+					+ "', '" + signUrl + "', '" + connotation + "')";
 			stmt.executeUpdate(sql);
 			System.out.println("Executed query : " + sql + "\n");
 
@@ -232,10 +236,11 @@ public class MySQLHelper {
 			// STEP 5: Extract data from result set
 			while (rs.next()) {
 				// Retrieve by column name
-				String textVal = rs.getString(Sign.VALUE_COLUMN);
-				String vidUrl = rs.getString(Sign.VID_URL_COLUMN);
-				String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN);
-				String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN);
+				// Replace any "_" with the correct "'"
+				String textVal = rs.getString(Sign.VALUE_COLUMN).replace("_", "'");
+				String vidUrl = rs.getString(Sign.VID_URL_COLUMN).replace("_", "'");
+				String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN).replace("_", "'");
+				String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN).replace("_", "'");
 
 				signList.add(new Sign(textVal, vidUrl, pageUrl, connotationVal));
 

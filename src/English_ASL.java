@@ -50,50 +50,7 @@ public class English_ASL extends HttpServlet {
 			throws ServletException, IOException {
 
 		// TODO Auto-generated method stub
-
-		for (char ch = 'a'; ch <= 'z'; ch++)
-			signList.add(((int) ch - 'a'), MySQLHelper.getAllSigns(Sign.TABLE_NAME.replace('*', ch)));
-
-		response.getWriter().append("Served at:").append(request.getContextPath());
-
-		PrintWriter out;
-
-		out = new PrintWriter(System.out);
-
-		PrintWriter xmlOut = null;
-		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
-
-		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-		Annotation annotation;
-		annotation = new Annotation("How many cups of water do you drink everyday?");
-		pipeline.annotate(annotation);
-
-		List<String> lemmas = new LinkedList<String>();
-		ArrayList<Sign> matchSigns = new ArrayList<Sign>();
-
-		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
-		for (CoreMap sentence : sentences) {
-			for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-				lemmas.add(token.get(LemmaAnnotation.class));
-			}
-		}
-
-		for (String lemma : lemmas) {
-			if (!lemma.matches(".*[^a-z].*")) {
-				if (getSignIfExist(lemma) != null) {
-					matchSigns.add(getSignIfExist(lemma));
-				} // else get the word spelled
-			}
-		}
-
-		for (Sign sign : matchSigns) {
-			out.write(sign.getVideoUrl() + "\n");
-		}
-		pipeline.prettyPrint(annotation, out);
-		annotation = new Annotation("water cups you drink everyday how many?");
-		pipeline.annotate(annotation);
-		pipeline.prettyPrint(annotation, out);
+		createInitialDatabase('a', 'z');
 
 	}
 
@@ -271,19 +228,18 @@ public class English_ASL extends HttpServlet {
 		if (div != null) {
 			if (div.toString().contains("<source src=")) {
 				int indexOfVideo = div.toString().indexOf("<source src=");
-				String garble = div.toString().substring(indexOfVideo);
-				int indexOfEnd = garble.indexOf(".mp4");
-				String videoUrl = "https://www.signingsavvy.com/" + garble.substring(13, indexOfEnd + 4);
-				Sign sign = new Sign();
-				sign.setVideoUrl(videoUrl);
+				String div_substring = div.toString().substring(indexOfVideo);
+				int indexOfEnd = div_substring.indexOf(".mp4");
+				String videoUrl = "https://www.signingsavvy.com/" + div_substring.substring(13, indexOfEnd + 4);
+				sgn.setVideoUrl(videoUrl);
 			}
 		}
 		return sgn;
 	}
 
 	/**
-	 * Returns a Sign that containts PageUrl, Connotation and Lemma Values from
-	 * a given Node
+	 * Returns a Sign that contains PageUrl, Connotation and Lemma Values from a
+	 * given Node
 	 * 
 	 * @param value
 	 * @return
@@ -308,8 +264,10 @@ public class English_ASL extends HttpServlet {
 
 			// @TODO: See about the need for the replace statements
 			if (connotation_tag - 2 - (endTag + 5) > 0) {
-				connotation = signUrl.substring(endTag + 5, connotation_tag - 2).toString()
-						.replace("(as in &amp;quot", "").replace("</a>", "").replace("/a>", "").replace(">", "").trim();
+				connotation = signUrl.substring(endTag + 5, connotation_tag - 2).toString();
+
+				// Sanitize the connotation value
+				connotation = cleanConnotationValue(connotation);
 
 			} else
 				connotation = "";
@@ -323,6 +281,34 @@ public class English_ASL extends HttpServlet {
 		return newSign;
 	}
 
+	/**
+	 * cleanConnotationValue
+	 * 
+	 * Cleans the html and special characters out of the Connotation value of
+	 * the Sign
+	 * 
+	 * @param connotation
+	 * @return
+	 */
+	public String cleanConnotationValue(String connotation) {
+
+		// To make sure there is no html or invalid characters in the
+		// connotation field replace them
+		connotation.replace("(as in &amp;quot", "");
+		connotation.replace("</a>", "");
+		connotation.replace("/a>", "");
+		connotation.replace(">", "").trim();
+		return connotation;
+	}
+
+	/**
+	 * getSignElements
+	 * 
+	 * Gets the Elements from the html page that contains the Signs in a list.
+	 * 
+	 * @param browsePageUrl
+	 * @return
+	 */
 	public Elements getSignElements(String browsePageUrl) {
 		org.jsoup.nodes.Document resultPage = null;
 		Elements browse = null;
