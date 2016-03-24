@@ -267,15 +267,17 @@ public class English_ASL extends HttpServlet {
 				connotation = signUrl.substring(endTag + 5, connotation_tag - 2).toString();
 
 				// Sanitize the connotation value
-				connotation = cleanConnotationValue(connotation);
 
-			} else
+			} else {
 				connotation = "";
+			}
 			signUrl = "https://www.signingsavvy.com/" + signUrl.substring(0, endCut);
 
 		}
-
+		// Sanitize the connotation value
+		connotation = cleanConnotationValue(connotation);
 		newSign.setConnotation(connotation);
+
 		newSign.setPageUrl(signUrl);
 		newSign.setLemmaValue(signText);
 		return newSign;
@@ -292,12 +294,20 @@ public class English_ASL extends HttpServlet {
 	 */
 	public String cleanConnotationValue(String connotation) {
 
+		CharSequence target = "(as in &amp;quot";
+		CharSequence replacement = "";
 		// To make sure there is no html or invalid characters in the
 		// connotation field replace them
-		connotation.replace("(as in &amp;quot", "");
-		connotation.replace("</a>", "");
-		connotation.replace("/a>", "");
-		connotation.replace(">", "").trim();
+		connotation = connotation.replace(target, replacement);
+
+		target = "</a>";
+		connotation = connotation.replace(target, replacement);
+
+		target = "/a>";
+		connotation = connotation.replace(target, replacement);
+
+		target = ">";
+		connotation = connotation.replace(target, replacement).trim();
 		return connotation;
 	}
 
