@@ -7,6 +7,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 
+import org.jsoup.nodes.Node;
+import org.jsoup.select.Elements;
+
 public class MySQLHelper {
 	// JDBC driver name and database URL
 	static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
@@ -16,7 +19,47 @@ public class MySQLHelper {
 	static final String USER = "root";
 	static final String PASS = "";
 
-	public static void createTable(char letter) {
+	// Creates a database and loads array for character range input
+	public void createInitialDatabase(char from, char to) {
+
+		WebParser parser = new WebParser();
+		for (char ch = from; ch <= to; ch++) {
+
+			MySQLHelper.dropTable(ch + "Sign");
+			MySQLHelper.createTable(ch);
+
+			String listUrl = "https://www.signingsavvy.com/browse/" + ch;
+			Elements signElements = parser.getSignElements(listUrl);
+			ArrayList<Sign> list = new ArrayList<>();
+
+			// if the list of ELements is not null
+			if (signElements != null) {
+				// Get the List Items that represent the Signs from the
+				// collection of Elements
+				for (Node value : signElements.get(0).getElementsByTag("li")) {
+					// Add the Signs as they are to the list
+					// ***The Signs in this list are not fully initialized yet.
+					list.add(parser.getSignFromNode(value));
+				}
+
+				// Get the Urls for the Videos
+				for (Sign sgn : list) {
+					sgn = parser.getVideoUrlFromSignPage(sgn);
+				}
+			}
+
+			MySQLHelper.insert(list, ch + "Sign");
+
+		}
+
+		return;
+	}
+
+	/**
+	 * 
+	 * @param letter
+	 */
+	static void createTable(char letter) {
 		Connection conn = null;
 		Statement stmt = null;
 		try {
@@ -59,6 +102,10 @@ public class MySQLHelper {
 		System.out.println("Goodbye!");
 	}
 
+	/**
+	 * 
+	 * @param name
+	 */
 	public static void dropTable(String name) {
 		Connection conn = null;
 		Statement stmt = null;
@@ -102,6 +149,11 @@ public class MySQLHelper {
 
 	}
 
+	/**
+	 * 
+	 * @param signList
+	 * @param table
+	 */
 	public static void insert(ArrayList<Sign> signList, String table) {
 		Connection conn = null;
 		Statement stmt = null;
@@ -161,6 +213,11 @@ public class MySQLHelper {
 
 	}// end main
 
+	/**
+	 * 
+	 * @param sign
+	 * @param table
+	 */
 	public static void insert(Sign sign, String table) {
 		Connection conn = null;
 		Statement stmt = null;
@@ -213,6 +270,11 @@ public class MySQLHelper {
 		} // end try
 	}
 
+	/**
+	 * 
+	 * @param table
+	 * @return
+	 */
 	public static ArrayList<Sign> getAllSigns(String table) {
 		ArrayList<Sign> signList = new ArrayList<Sign>();
 		Connection conn = null;
