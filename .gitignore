@@ -66,3 +66,15 @@ WebContent/WEB-INF/lib/stanford-corenlp-3.6.0-models.jar
 WebContent/WEB-INF/lib/stanford-corenlp-3.6.0.jar
 
 WebContent/WEB-INF/lib/xom.jar
+
+WebContent/WEB-INF/lib/hamcrest-core-1.3.jar
+
+WebContent/WEB-INF/lib/junit-4.12.jar
+
+WebContent/WEB-INF/lib/mockito-all-1.10.19.jar
+
+WebContent/WEB-INF/lib/mockito-core-2.0.44-beta.jar
+
+build/classes/hamcrest-core-1.3.jar
+
+*.jar
