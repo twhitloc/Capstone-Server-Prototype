@@ -19,11 +19,16 @@ public class Translator {
 	private String inputString;
 	private String translatedString;
 	private OutputStreamWriter outputStream;
+	private Properties props;
+	private StanfordCoreNLP pipeline;
 
 	public Translator(List<List<Sign>> list) {
 		if (list != null) {
 			signList = list;
 		}
+		props = new Properties();
+		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+		pipeline = new StanfordCoreNLP(props);
 	}
 
 	public ArrayList<String> getLemmasFromCoreMap(List<CoreMap> sentences) {
@@ -99,11 +104,7 @@ public class Translator {
 	 * @return
 	 */
 	public void createTranslation() {
-		// PrintWriter xmlOut = null;
-		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 
-		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 		Annotation annotation;
 		annotation = new Annotation(inputString);
 		pipeline.annotate(annotation);
