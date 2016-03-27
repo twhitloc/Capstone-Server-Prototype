@@ -64,7 +64,7 @@ public class English_ASL extends HttpServlet {
 		OutputStreamWriter responseStream = new OutputStreamWriter(response.getOutputStream());
 		String input = getRequestInformation(request);
 
-		input = determineAction(input);
+		input = getUserRequest(input);
 		switch (serverAction) {
 
 		// 1: Save Phrase
@@ -126,6 +126,32 @@ public class English_ASL extends HttpServlet {
 	}
 
 	/**
+	 * Determine which action the server should take based on what the value of
+	 * the first index of the input String is.
+	 * 
+	 * 1: Save Phrase 2: Get Sign Information 3: Translate Phrase
+	 * 
+	 * @param input
+	 * @return action-trimmed Input
+	 */
+	public String getUserRequest(String input) {
+		String action = input.substring(0, 1);
+		switch (Integer.parseInt(action)) {
+		case 1:
+			serverAction = 1;
+			break;
+		case 2:
+			serverAction = 2;
+			break;
+		case 3:
+			serverAction = 3;
+			break;
+
+		}
+		return input.substring(1, input.length());
+	}
+
+	/**
 	 * writeSignsToResponseStream
 	 * 
 	 * Writes the signs in the list to the response stream so that the client
@@ -147,31 +173,5 @@ public class English_ASL extends HttpServlet {
 				e.printStackTrace();
 			}
 		}
-	}
-
-	/**
-	 * Determine which action the server should take based on what the value of
-	 * the first index of the input String is.
-	 * 
-	 * 1: Save Phrase 2: Get Sign Information 3: Translate Phrase
-	 * 
-	 * @param input
-	 * @return action-trimmed Input
-	 */
-	public String determineAction(String input) {
-		String action = input.substring(0, 1);
-		switch (Integer.parseInt(action)) {
-		case 1:
-			serverAction = 1;
-			break;
-		case 2:
-			serverAction = 2;
-			break;
-		case 3:
-			serverAction = 3;
-			break;
-
-		}
-		return input.substring(1, input.length());
 	}
 }

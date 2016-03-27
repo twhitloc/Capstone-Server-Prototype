@@ -31,6 +31,45 @@ public class Translator {
 		pipeline = new StanfordCoreNLP(props);
 	}
 
+	/**
+	 * closeSession
+	 * 
+	 * Will terminate the current session by clearing session variables.
+	 * Necessary to start a new translation session.
+	 */
+	public void closeSession() {
+		responseList = null;
+		inputString = null;
+		translatedString = null;
+		outputStream = null;
+	}
+
+	/**
+	 * 
+	 * @param input
+	 * @return
+	 */
+	public void createTranslation() {
+
+		Annotation annotation;
+		annotation = new Annotation(inputString);
+		pipeline.annotate(annotation);
+
+		PrintWriter srvout;
+		srvout = new PrintWriter(System.out);
+
+		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
+		ArrayList<String> lemmas = getLemmasFromCoreMap(sentences);
+		ArrayList<Sign> matchSigns = getSignListFromLemmas(lemmas);
+
+		pipeline.prettyPrint(annotation, srvout);
+
+		// @TODO this is not correct!
+		translatedString = lemmas.toString();
+
+		responseList = matchSigns;
+	}
+
 	public ArrayList<String> getLemmasFromCoreMap(List<CoreMap> sentences) {
 		int i = 0;
 		ArrayList<String> lemmas = new ArrayList<String>();
@@ -49,27 +88,6 @@ public class Translator {
 			// problems too many input sentences
 		}
 		return lemmas;
-	}
-
-	/**
-	 * getSignListFromLemmas
-	 * 
-	 * get a list of Signs that match with Lemma list
-	 * 
-	 * @param lemmas
-	 * @return matchingSignList
-	 */
-	public ArrayList<Sign> getSignListFromLemmas(List<String> lemmas) {
-		ArrayList<Sign> matchSigns = new ArrayList<Sign>();
-		for (String lemma : lemmas) {
-			if (!lemma.matches(".*[^a-z].*")) {
-				if (getSignIfExist(lemma) != null) {
-					matchSigns.add(getSignIfExist(lemma));
-				}
-				// else get the word spelled out
-			}
-		}
-		return matchSigns;
 	}
 
 	/**
@@ -99,42 +117,24 @@ public class Translator {
 	}
 
 	/**
+	 * getSignListFromLemmas
 	 * 
-	 * @param input
-	 * @return
-	 */
-	public void createTranslation() {
-
-		Annotation annotation;
-		annotation = new Annotation(inputString);
-		pipeline.annotate(annotation);
-
-		PrintWriter srvout;
-		srvout = new PrintWriter(System.out);
-
-		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
-		ArrayList<String> lemmas = getLemmasFromCoreMap(sentences);
-		ArrayList<Sign> matchSigns = getSignListFromLemmas(lemmas);
-
-		pipeline.prettyPrint(annotation, srvout);
-
-		// @TODO this is not correct!
-		translatedString = lemmas.toString();
-
-		responseList = matchSigns;
-	}
-
-	/**
-	 * closeSession
+	 * get a list of Signs that match with Lemma list
 	 * 
-	 * Will terminate the current session by clearing session variables.
-	 * Necessary to start a new translation session.
+	 * @param lemmas
+	 * @return matchingSignList
 	 */
-	public void closeSession() {
-		responseList = null;
-		inputString = null;
-		translatedString = null;
-		outputStream = null;
+	public ArrayList<Sign> getSignListFromLemmas(List<String> lemmas) {
+		ArrayList<Sign> matchSigns = new ArrayList<Sign>();
+		for (String lemma : lemmas) {
+			if (!lemma.matches(".*[^a-z].*")) {
+				if (getSignIfExist(lemma) != null) {
+					matchSigns.add(getSignIfExist(lemma));
+				}
+				// else get the word spelled out
+			}
+		}
+		return matchSigns;
 	}
 
 	public void initiateSession(OutputStreamWriter out, String input) {

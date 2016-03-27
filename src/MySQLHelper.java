@@ -25,6 +25,358 @@ public class MySQLHelper {
 	private static Statement stmt = null;
 
 	/**
+	 * 
+	 * @param letter
+	 */
+	static void createSignTable(char letter) {
+
+		Statement stmt = null;
+		try {
+			conn = startSession();
+			// STEP 4: Execute a query
+			System.out.println("Creating table in given database...");
+			stmt = conn.createStatement();
+
+			String sql = Sign.CREATE_SIGN_TABLE;
+			sql = sql.replace("*", letter + "");
+			stmt.executeUpdate(sql);
+			System.out.println("Created table in given database...");
+		} catch (SQLException se) {
+			// Handle errors for JDBC
+			se.printStackTrace();
+		} finally {
+			// finally block used to close resources
+			endSession();
+		} // end try
+
+	}
+
+	/**
+	 * Create the Database Table for Translated Phrases
+	 */
+	static void createTranslatedPhraseTable(int num) {
+		Statement stmt = null;
+
+		try {
+			conn = startSession();
+			System.out.println("Creating table in given database...");
+			stmt = conn.createStatement();
+
+			String sql = TranslatedPhrase.CREATE_TRANSLATED_PHRASE_TABLE;
+			sql = sql.replace("*", num + "");
+			stmt.executeUpdate(sql);
+			System.out.println("Created table in given database...");
+
+		} catch (SQLException se) {
+			se.printStackTrace();
+		} finally {
+			endSession();
+		}
+
+	}
+
+	/**
+	 * 
+	 * @param name
+	 */
+	public static void dropSignTable(String name) {
+
+		try {
+			conn = startSession();
+
+			// STEP 4: Execute a query
+			System.out.println("Deleting table in given database...");
+			stmt = conn.createStatement();
+
+			String sql = "DROP TABLE IF EXISTS " + name;
+
+			stmt.executeUpdate(sql);
+			System.out.println("Executed query : " + sql + "\n");
+		} catch (SQLException se) {
+			// Handle errors for JDBC
+			se.printStackTrace();
+		} finally {
+			// finally block used to close resources
+
+			endSession();
+
+		} // end try
+
+	}
+
+	public static void endSession() {
+		try {
+			if (stmt != null)
+				conn.close();
+		} catch (SQLException se) {
+		} // do nothing
+		try {
+			if (conn != null)
+				conn.close();
+		} catch (SQLException se) {
+			se.printStackTrace();
+		} // end finally try
+		System.out.println("Database Closed");
+	}
+
+	/**
+	 * 
+	 * @param table
+	 * @return
+	 */
+	public static ArrayList<Sign> getAllSigns(String table) {
+		ArrayList<Sign> signList = new ArrayList<Sign>();
+
+		try {
+			conn = startSession();
+			// STEP 4: Execute a query
+			System.out.println("Creating statement...");
+			stmt = conn.createStatement();
+
+			String sql = "SELECT * FROM " + table;
+			ResultSet rs = stmt.executeQuery(sql);
+			System.out.println("Executed Query " + sql + "\n");
+			// STEP 5: Extract data from result set
+			while (rs.next()) {
+				// Retrieve by column name
+				signList.add(getSignFromResultSet(rs));
+			}
+			rs.close();
+		} catch (SQLException se) {
+			// Handle errors for JDBC
+			se.printStackTrace();
+		} finally {
+			// finally block used to close resources
+			endSession();
+		} // end try
+		return signList;
+	}
+
+	/**
+	 * 
+	 * @param table
+	 * @return
+	 */
+	public static ArrayList<TranslatedPhrase> getAllTranslatedPhrases(String table) {
+		ArrayList<TranslatedPhrase> phraseList = new ArrayList<TranslatedPhrase>();
+
+		try {
+			conn = startSession();
+			// STEP 4: Execute a query
+			System.out.println("Creating statement...");
+			stmt = conn.createStatement();
+
+			String sql = "SELECT * FROM " + table;
+			ResultSet rs = stmt.executeQuery(sql);
+			System.out.println("Executed Query " + sql + "\n");
+			// STEP 5: Extract data from result set
+			while (rs.next()) {
+				// Retrieve by column name
+				phraseList.add(getTranslatedPhraseFromResultSet(rs));
+			}
+			rs.close();
+		} catch (SQLException se) {
+			// Handle errors for JDBC
+			se.printStackTrace();
+		} finally {
+			// finally block used to close resources
+			endSession();
+		} // end try
+		return phraseList;
+	}
+
+	/**
+	 * 
+	 * @param rs
+	 * @return
+	 */
+	public static Sign getSignFromResultSet(ResultSet rs) {
+		String textVal;
+		try {
+			textVal = rs.getString(Sign.VALUE_COLUMN).replace("_", "'");
+			String vidUrl = rs.getString(Sign.VID_URL_COLUMN).replace("_", "'");
+			String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN).replace("_", "'");
+			String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN).replace("_", "'");
+			return new Sign(textVal, vidUrl, pageUrl, connotationVal);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return new Sign();
+	}
+
+	/**
+	 * 
+	 * @param sign
+	 * @param table
+	 * @return
+	 */
+	public static String getSignSQLInsert(Sign sign, String table) {
+		String textVal = "", signUrl = "", vidUrl = "", connotation = "";
+
+		// If the sign contains an apostrophe then it cannot be
+		// inserted. Replace during DB Operations
+		textVal = sign.getLemmaValue().replace("'", "_");
+		signUrl = sign.getPageUrl().replace("'", "_");
+		vidUrl = sign.getVideoUrl().replace("'", "_");
+		connotation = sign.getConnotation().replace("'", "_");
+
+		String sql = "INSERT INTO " + table + " VALUES ('" + textVal + "', '" + vidUrl + "', '" + signUrl + "', '"
+				+ connotation + "')";
+
+		return sql;
+	}
+
+	/**
+	 * 
+	 * @param rs
+	 * @return
+	 */
+	public static TranslatedPhrase getTranslatedPhraseFromResultSet(ResultSet rs) {
+		String english, asl;
+		try {
+			english = rs.getString(TranslatedPhrase.ENGLISH_COLUMN).replace("_", "'");
+			asl = rs.getString(TranslatedPhrase.ASL_COLUMN).replace("_", "'");
+
+			return new TranslatedPhrase(english, asl);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return new TranslatedPhrase();
+	}
+
+	/**
+	 * 
+	 * @param tp
+	 * @param table
+	 * @return
+	 */
+	public static String getTranslatedPhraseSQLInsert(TranslatedPhrase tp, String table) {
+		String english = "";
+		String asl = "";
+		String sql = "";
+
+		english = tp.getEnglishPhrase().replace("'", "_");
+		asl = tp.getASLPhrase().replace("'", "_");
+
+		sql = "INSERT INTO " + table + " VALUES ('" + english + "', '" + asl + "')";
+
+		return sql;
+	}
+
+	/**
+	 * 
+	 * @param sign
+	 * @param table
+	 */
+	public static void insertSign(Sign sign, String table) {
+
+		try {
+			conn = startSession();
+			// STEP 4: Execute a query
+			System.out.println("Inserting records into the table...");
+			stmt = conn.createStatement();
+
+			String sql = getSignSQLInsert(sign, table);
+			stmt.executeUpdate(sql);
+			System.out.println("Executed query : " + sql + "\n");
+
+		} catch (SQLException se) {
+			se.printStackTrace();
+		} finally {
+			endSession();
+		} // end try
+	}
+
+	/**
+	 * 
+	 * @param signList
+	 * @param table
+	 */
+	public static void insertSignList(ArrayList<Sign> signList, String table) {
+
+		try {
+			conn = startSession();
+
+			// STEP 4: Execute a query
+			System.out.println("Inserting records into the table...");
+			for (Sign sign : signList) {
+				try {
+					stmt = conn.createStatement();
+
+					String sql = getSignSQLInsert(sign, table);
+					stmt.executeUpdate(sql);
+					System.out.println("Executed query : " + sql + "\n");
+				} catch (SQLException se) {
+					se.printStackTrace();
+				}
+			}
+		} catch (Exception e) {
+			// Handle errors for Class.forName
+			e.printStackTrace();
+		} finally {
+			endSession();
+		} // end try
+
+	}// end main
+
+	/**
+	 * 
+	 * @param sign
+	 * @param table
+	 */
+	public static void insertTranslatedPhrase(TranslatedPhrase tp) {
+
+		char ch = (char) tp.getEnglishPhrase().length();
+		String table = TranslatedPhrase.TABLE_NAME.replace('*', ch);
+		try {
+			conn = startSession();
+			// STEP 4: Execute a query
+			System.out.println("Inserting records into the table...");
+			stmt = conn.createStatement();
+
+			String sql = getTranslatedPhraseSQLInsert(tp, table);
+			stmt.executeUpdate(sql);
+			System.out.println("Executed query : " + sql + "\n");
+
+		} catch (SQLException se) {
+			se.printStackTrace();
+		} finally {
+			endSession();
+		} // end try
+	}
+
+	/**
+	 * 
+	 * @return
+	 */
+	public static Connection startSession() {
+
+		Connection conn = null;
+		try {
+			Class.forName(NAME);
+			// STEP 3: Open a connection
+			System.out.println("Connecting to database...");
+			try {
+				conn = DriverManager.getConnection(DB_URL, USER, PASS);
+				System.out.println("Connected database successfully...");
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} // Register Driver
+
+		return conn;
+	}
+
+	/**
 	 * createInitialDatabase
 	 * 
 	 * Drops any outdated databases. Creates new database for signs that begin
@@ -66,223 +418,5 @@ public class MySQLHelper {
 		}
 
 		return;
-	}
-
-	public static void endSession() {
-		try {
-			if (stmt != null)
-				conn.close();
-		} catch (SQLException se) {
-		} // do nothing
-		try {
-			if (conn != null)
-				conn.close();
-		} catch (SQLException se) {
-			se.printStackTrace();
-		} // end finally try
-	}
-
-	public static Connection startSession() {
-
-		Connection conn = null;
-		try {
-			Class.forName(NAME);
-			// STEP 3: Open a connection
-			System.out.println("Connecting to database...");
-			try {
-				conn = DriverManager.getConnection(DB_URL, USER, PASS);
-				System.out.println("Connected database successfully...");
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} // Register Driver
-
-		return conn;
-	}
-
-	/**
-	 * 
-	 * @param letter
-	 */
-	static void createSignTable(char letter) {
-
-		Statement stmt = null;
-		try {
-			Connection conn = startSession();
-			// STEP 4: Execute a query
-			System.out.println("Creating table in given database...");
-			stmt = conn.createStatement();
-
-			String sql = Sign.CREATE_SIGN_TABLE;
-			sql = sql.replace("*", letter + "");
-			stmt.executeUpdate(sql);
-			System.out.println("Created table in given database...");
-		} catch (SQLException se) {
-			// Handle errors for JDBC
-			se.printStackTrace();
-		} finally {
-			// finally block used to close resources
-			endSession();
-		} // end try
-		System.out.println("Goodbye!");
-	}
-
-	/**
-	 * 
-	 * @param name
-	 */
-	public static void dropSignTable(String name) {
-
-		try {
-			conn = startSession();
-
-			// STEP 4: Execute a query
-			System.out.println("Deleting table in given database...");
-			stmt = conn.createStatement();
-
-			String sql = "DROP TABLE IF EXISTS " + name;
-
-			stmt.executeUpdate(sql);
-			System.out.println("Executed query : " + sql + "\n");
-		} catch (SQLException se) {
-			// Handle errors for JDBC
-			se.printStackTrace();
-		} finally {
-			// finally block used to close resources
-
-			endSession();
-
-		} // end try
-
-	}
-
-	/**
-	 * 
-	 * @param signList
-	 * @param table
-	 */
-	public static void insertSignList(ArrayList<Sign> signList, String table) {
-
-		try {
-			conn = startSession();
-
-			// STEP 4: Execute a query
-			System.out.println("Inserting records into the table...");
-			for (Sign sign : signList) {
-				try {
-					stmt = conn.createStatement();
-
-					String textVal = "", signUrl = "", vidUrl = "", connotation = "";
-
-					// If the sign contains an apostrophe then it cannot be
-					// inserted. Replace during DB Operations
-					textVal = sign.getLemmaValue().replace("'", "_");
-					signUrl = sign.getPageUrl().replace("'", "_");
-					vidUrl = sign.getVideoUrl().replace("'", "_");
-					connotation = sign.getConnotation().replace("'", "_");
-
-					String sql = "INSERT INTO" + " " + table + " " + "VALUES ('" + textVal.replace("'", "_") + "', '"
-							+ vidUrl + "', '" + signUrl + "', '" + connotation + "')";
-					stmt.executeUpdate(sql);
-					System.out.println("Executed query : " + sql + "\n");
-				} catch (SQLException se) {
-					se.printStackTrace();
-				}
-			}
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			e.printStackTrace();
-		} finally {
-			endSession();
-		} // end try
-
-	}// end main
-
-	/**
-	 * 
-	 * @param sign
-	 * @param table
-	 */
-	public static void insertSign(Sign sign, String table) {
-
-		try {
-			conn = startSession();
-			// STEP 4: Execute a query
-			System.out.println("Inserting records into the table...");
-			stmt = conn.createStatement();
-
-			String textVal = "", signUrl = "", vidUrl = "", connotation = "";
-
-			// If the sign contains an apostrophe then it cannot be inserted.
-			// Replace during DB Operations
-			textVal = sign.getLemmaValue().replace("'", "_");
-			signUrl = sign.getPageUrl().replace("'", "_");
-			vidUrl = sign.getVideoUrl().replace("'", "_");
-			connotation = sign.getConnotation().replace("'", "_");
-
-			String sql = "INSERT INTO" + " " + table + " " + "VALUES ('" + textVal.replace("'", "_") + "', '" + vidUrl
-					+ "', '" + signUrl + "', '" + connotation + "')";
-			stmt.executeUpdate(sql);
-			System.out.println("Executed query : " + sql + "\n");
-
-		} catch (SQLException se) {
-			se.printStackTrace();
-		} finally {
-			endSession();
-		} // end try
-	}
-
-	/**
-	 * 
-	 * @param table
-	 * @return
-	 */
-	public static ArrayList<Sign> getAllSigns(String table) {
-		ArrayList<Sign> signList = new ArrayList<Sign>();
-
-		try {
-			conn = startSession();
-			// STEP 4: Execute a query
-			System.out.println("Creating statement...");
-			stmt = conn.createStatement();
-
-			String sql = "SELECT * FROM " + table;
-			ResultSet rs = stmt.executeQuery(sql);
-			System.out.println("Executed Query " + sql + "\n");
-			// STEP 5: Extract data from result set
-			while (rs.next()) {
-				// Retrieve by column name
-				signList.add(getSignFromResultSet(rs));
-			}
-			rs.close();
-		} catch (SQLException se) {
-			// Handle errors for JDBC
-			se.printStackTrace();
-		} finally {
-			// finally block used to close resources
-			endSession();
-		} // end try
-		return signList;
-	}
-
-	public static Sign getSignFromResultSet(ResultSet rs) {
-		String textVal;
-		try {
-			textVal = rs.getString(Sign.VALUE_COLUMN).replace("_", "'");
-			String vidUrl = rs.getString(Sign.VID_URL_COLUMN).replace("_", "'");
-			String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN).replace("_", "'");
-			String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN).replace("_", "'");
-			return new Sign(textVal, vidUrl, pageUrl, connotationVal);
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		return new Sign();
 	}
 }
