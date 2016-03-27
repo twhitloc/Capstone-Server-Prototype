@@ -70,6 +70,31 @@ public class Translator {
 		responseList = matchSigns;
 	}
 
+	/**
+	 * 
+	 */
+	public void getSignedEnglish() {
+
+		Annotation annotation;
+		annotation = new Annotation(inputString);
+		pipeline.annotate(annotation);
+
+		PrintWriter srvout;
+		srvout = new PrintWriter(System.out);
+
+		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
+		ArrayList<String> lemmas = getLemmasFromCoreMap(sentences);
+		ArrayList<Sign> matchSigns = getSignListFromLemmas(lemmas);
+
+		pipeline.prettyPrint(annotation, srvout);
+
+		// @TODO this is not correct!
+		translatedString = lemmas.toString();
+
+		responseList = matchSigns;
+
+	}
+
 	public ArrayList<String> getLemmasFromCoreMap(List<CoreMap> sentences) {
 		int i = 0;
 		ArrayList<String> lemmas = new ArrayList<String>();
@@ -140,6 +165,5 @@ public class Translator {
 	public void initiateSession(OutputStreamWriter out, String input) {
 		outputStream = out;
 		inputString = input;
-
 	}
 }
