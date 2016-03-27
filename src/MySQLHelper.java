@@ -19,14 +19,27 @@ public class MySQLHelper {
 	static final String USER = "root";
 	static final String PASS = "";
 
-	// Creates a database and loads array for character range input
-	public void createInitialDatabase(char from, char to) {
+	static final String NAME = "com.mysql.jdbc.Driver";
+
+	private static Connection conn = null;
+	private static Statement stmt = null;
+
+	/**
+	 * createInitialDatabase
+	 * 
+	 * Drops any outdated databases. Creates new database for signs that begin
+	 * with 'from' up to 'to'
+	 * 
+	 * @param from
+	 * @param to
+	 */
+	public void createInitialSignDatabase(char from, char to) {
 
 		WebParser parser = new WebParser();
 		for (char ch = from; ch <= to; ch++) {
 
-			MySQLHelper.dropTable(ch + "Sign");
-			MySQLHelper.createTable(ch);
+			MySQLHelper.dropSignTable(ch + "Sign");
+			MySQLHelper.createSignTable(ch);
 
 			String listUrl = "https://www.signingsavvy.com/browse/" + ch;
 			Elements signElements = parser.getSignElements(listUrl);
@@ -48,29 +61,59 @@ public class MySQLHelper {
 				}
 			}
 
-			MySQLHelper.insert(list, ch + "Sign");
+			MySQLHelper.insertSignList(list, ch + "Sign");
 
 		}
 
 		return;
 	}
 
+	public static void endSession() {
+		try {
+			if (stmt != null)
+				conn.close();
+		} catch (SQLException se) {
+		} // do nothing
+		try {
+			if (conn != null)
+				conn.close();
+		} catch (SQLException se) {
+			se.printStackTrace();
+		} // end finally try
+	}
+
+	public static Connection startSession() {
+
+		Connection conn = null;
+		try {
+			Class.forName(NAME);
+			// STEP 3: Open a connection
+			System.out.println("Connecting to database...");
+			try {
+				conn = DriverManager.getConnection(DB_URL, USER, PASS);
+				System.out.println("Connected database successfully...");
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} // Register Driver
+
+		return conn;
+	}
+
 	/**
 	 * 
 	 * @param letter
 	 */
-	static void createTable(char letter) {
-		Connection conn = null;
+	static void createSignTable(char letter) {
+
 		Statement stmt = null;
 		try {
-			// STEP 2: Register JDBC driver
-			Class.forName("com.mysql.jdbc.Driver");
-
-			// STEP 3: Open a connection
-			System.out.println("Connecting to database...");
-			conn = DriverManager.getConnection(DB_URL, USER, PASS);
-			System.out.println("Connected database successfully...");
-
+			Connection conn = startSession();
 			// STEP 4: Execute a query
 			System.out.println("Creating table in given database...");
 			stmt = conn.createStatement();
@@ -82,22 +125,9 @@ public class MySQLHelper {
 		} catch (SQLException se) {
 			// Handle errors for JDBC
 			se.printStackTrace();
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			e.printStackTrace();
 		} finally {
 			// finally block used to close resources
-			try {
-				if (stmt != null)
-					conn.close();
-			} catch (SQLException se) {
-			} // do nothing
-			try {
-				if (conn != null)
-					conn.close();
-			} catch (SQLException se) {
-				se.printStackTrace();
-			} // end finally try
+			endSession();
 		} // end try
 		System.out.println("Goodbye!");
 	}
@@ -106,17 +136,10 @@ public class MySQLHelper {
 	 * 
 	 * @param name
 	 */
-	public static void dropTable(String name) {
-		Connection conn = null;
-		Statement stmt = null;
-		try {
-			// STEP 2: Register JDBC driver
-			Class.forName("com.mysql.jdbc.Driver");
+	public static void dropSignTable(String name) {
 
-			// STEP 3: Open a connection
-			System.out.println("Connecting to database...");
-			conn = DriverManager.getConnection(DB_URL, USER, PASS);
-			System.out.println("Connected database successfully...");
+		try {
+			conn = startSession();
 
 			// STEP 4: Execute a query
 			System.out.println("Deleting table in given database...");
@@ -129,22 +152,11 @@ public class MySQLHelper {
 		} catch (SQLException se) {
 			// Handle errors for JDBC
 			se.printStackTrace();
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			e.printStackTrace();
 		} finally {
 			// finally block used to close resources
-			try {
-				if (stmt != null)
-					conn.close();
-			} catch (SQLException se) {
-			} // do nothing
-			try {
-				if (conn != null)
-					conn.close();
-			} catch (SQLException se) {
-				se.printStackTrace();
-			} // end finally try
+
+			endSession();
+
 		} // end try
 
 	}
@@ -154,17 +166,10 @@ public class MySQLHelper {
 	 * @param signList
 	 * @param table
 	 */
-	public static void insert(ArrayList<Sign> signList, String table) {
-		Connection conn = null;
-		Statement stmt = null;
-		try {
-			// STEP 2: Register JDBC driver
-			Class.forName("com.mysql.jdbc.Driver");
+	public static void insertSignList(ArrayList<Sign> signList, String table) {
 
-			// STEP 3: Open a connection
-			System.out.println("Connecting to a selected database...");
-			conn = DriverManager.getConnection(DB_URL, USER, PASS);
-			System.out.println("Connected database successfully...");
+		try {
+			conn = startSession();
 
 			// STEP 4: Execute a query
 			System.out.println("Inserting records into the table...");
@@ -189,26 +194,11 @@ public class MySQLHelper {
 					se.printStackTrace();
 				}
 			}
-
-		} catch (SQLException se) {
-			// Handle errors for JDBC
-			se.printStackTrace();
 		} catch (Exception e) {
 			// Handle errors for Class.forName
 			e.printStackTrace();
 		} finally {
-			// finally block used to close resources
-			try {
-				if (stmt != null)
-					conn.close();
-			} catch (SQLException se) {
-			} // do nothing
-			try {
-				if (conn != null)
-					conn.close();
-			} catch (SQLException se) {
-				se.printStackTrace();
-			} // end finally try
+			endSession();
 		} // end try
 
 	}// end main
@@ -218,18 +208,10 @@ public class MySQLHelper {
 	 * @param sign
 	 * @param table
 	 */
-	public static void insert(Sign sign, String table) {
-		Connection conn = null;
-		Statement stmt = null;
+	public static void insertSign(Sign sign, String table) {
+
 		try {
-			// STEP 2: Register JDBC driver
-			Class.forName("com.mysql.jdbc.Driver");
-
-			// STEP 3: Open a connection
-			System.out.println("Connecting to a selected database...");
-			conn = DriverManager.getConnection(DB_URL, USER, PASS);
-			System.out.println("Connected database successfully...");
-
+			conn = startSession();
 			// STEP 4: Execute a query
 			System.out.println("Inserting records into the table...");
 			stmt = conn.createStatement();
@@ -249,24 +231,9 @@ public class MySQLHelper {
 			System.out.println("Executed query : " + sql + "\n");
 
 		} catch (SQLException se) {
-			// Handle errors for JDBC
 			se.printStackTrace();
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			e.printStackTrace();
 		} finally {
-			// finally block used to close resources
-			try {
-				if (stmt != null)
-					conn.close();
-			} catch (SQLException se) {
-			} // do nothing
-			try {
-				if (conn != null)
-					conn.close();
-			} catch (SQLException se) {
-				se.printStackTrace();
-			} // end finally try
+			endSession();
 		} // end try
 	}
 
@@ -277,17 +244,9 @@ public class MySQLHelper {
 	 */
 	public static ArrayList<Sign> getAllSigns(String table) {
 		ArrayList<Sign> signList = new ArrayList<Sign>();
-		Connection conn = null;
-		Statement stmt = null;
+
 		try {
-			// STEP 2: Register JDBC driver
-			Class.forName("com.mysql.jdbc.Driver");
-
-			// STEP 3: Open a connection
-			System.out.println("Connecting to a selected database...");
-			conn = DriverManager.getConnection(DB_URL, USER, PASS);
-			System.out.println("Connected database successfully...");
-
+			conn = startSession();
 			// STEP 4: Execute a query
 			System.out.println("Creating statement...");
 			stmt = conn.createStatement();
@@ -298,36 +257,32 @@ public class MySQLHelper {
 			// STEP 5: Extract data from result set
 			while (rs.next()) {
 				// Retrieve by column name
-				// Replace any "_" with the correct "'"
-				String textVal = rs.getString(Sign.VALUE_COLUMN).replace("_", "'");
-				String vidUrl = rs.getString(Sign.VID_URL_COLUMN).replace("_", "'");
-				String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN).replace("_", "'");
-				String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN).replace("_", "'");
-
-				signList.add(new Sign(textVal, vidUrl, pageUrl, connotationVal));
-
+				signList.add(getSignFromResultSet(rs));
 			}
 			rs.close();
 		} catch (SQLException se) {
 			// Handle errors for JDBC
 			se.printStackTrace();
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			e.printStackTrace();
 		} finally {
 			// finally block used to close resources
-			try {
-				if (stmt != null)
-					conn.close();
-			} catch (SQLException se) {
-			} // do nothing
-			try {
-				if (conn != null)
-					conn.close();
-			} catch (SQLException se) {
-				se.printStackTrace();
-			} // end finally try
+			endSession();
 		} // end try
 		return signList;
+	}
+
+	public static Sign getSignFromResultSet(ResultSet rs) {
+		String textVal;
+		try {
+			textVal = rs.getString(Sign.VALUE_COLUMN).replace("_", "'");
+			String vidUrl = rs.getString(Sign.VID_URL_COLUMN).replace("_", "'");
+			String pageUrl = rs.getString(Sign.PAGE_URL_COLUMN).replace("_", "'");
+			String connotationVal = rs.getString(Sign.CONNOTATION_VALUE_COLUMN).replace("_", "'");
+			return new Sign(textVal, vidUrl, pageUrl, connotationVal);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return new Sign();
 	}
 }

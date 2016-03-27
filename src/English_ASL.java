@@ -24,6 +24,8 @@ public class English_ASL extends HttpServlet {
 	List<List<Sign>> signList = new ArrayList<List<Sign>>(26);
 	//
 	private Translator translator;
+	private int serverAction = 0;
+	//
 
 	/**
 	 * @see HttpServlet#HttpServlet()
@@ -62,13 +64,35 @@ public class English_ASL extends HttpServlet {
 		OutputStreamWriter responseStream = new OutputStreamWriter(response.getOutputStream());
 		String input = getRequestInformation(request);
 
-		translator.initiateSession(responseStream, input);
-		// TODO Auto-generated method stub
+		input = determineAction(input);
+		switch (serverAction) {
 
-		translator.createTranslation();
-		ArrayList<Sign> responseList = translator.responseList;
-		translator.closeSession();
-		writeSignsToResponseStream(responseList, responseStream);
+		// 1: Save Phrase
+		case 1:
+			break;
+		// 2: Get Sign Information
+		case 2:
+			break;
+		// 3: Translate Phrase
+		case 3:
+
+			// initiate a translator session
+			translator.initiateSession(responseStream, input);
+
+			// create a translation
+			translator.createTranslation();
+
+			// get the list of signs that represent that translation
+			ArrayList<Sign> responseList = translator.responseList;
+
+			// clear the session for the next request
+			translator.closeSession();
+
+			// write the results to the stream
+			writeSignsToResponseStream(responseList, responseStream);
+
+			break;
+		}
 		responseStream.flush();
 		responseStream.close();
 	}
@@ -123,5 +147,31 @@ public class English_ASL extends HttpServlet {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	/**
+	 * Determine which action the server should take based on what the value of
+	 * the first index of the input String is.
+	 * 
+	 * 1: Save Phrase 2: Get Sign Information 3: Translate Phrase
+	 * 
+	 * @param input
+	 * @return action-trimmed Input
+	 */
+	public String determineAction(String input) {
+		String action = input.substring(0, 1);
+		switch (Integer.parseInt(action)) {
+		case 1:
+			serverAction = 1;
+			break;
+		case 2:
+			serverAction = 2;
+			break;
+		case 3:
+			serverAction = 3;
+			break;
+
+		}
+		return input.substring(1, input.length());
 	}
 }

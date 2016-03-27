@@ -117,8 +117,8 @@ public class WebParser {
 		List<List<Sign>> signList = new ArrayList<List<Sign>>();
 		for (char ch = from; ch <= to; ch++) {
 
-			MySQLHelper.dropTable(ch + "Sign");
-			MySQLHelper.createTable(ch);
+			MySQLHelper.dropSignTable(ch + "Sign");
+			MySQLHelper.createSignTable(ch);
 
 			String listUrl = "https://www.signingsavvy.com/browse/" + ch;
 			Elements signElements = getSignElements(listUrl);
@@ -140,7 +140,7 @@ public class WebParser {
 				}
 			}
 
-			MySQLHelper.insert(list, ch + "Sign");
+			MySQLHelper.insertSignList(list, ch + "Sign");
 			signList.add(list);
 		}
 
