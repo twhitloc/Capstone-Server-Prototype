@@ -54,7 +54,7 @@ public class MySQLHelper {
 	/**
 	 * Create the Database Table for Translated Phrases
 	 */
-	static void createTranslatedPhraseTable(int num) {
+	static void createTranslatedPhraseTable() {
 
 		try {
 			conn = startSession();
@@ -63,10 +63,8 @@ public class MySQLHelper {
 
 			String sql = TranslatedPhrase.CREATE_TRANSLATED_PHRASE_TABLE;
 
-			sql = sql.replace("*", num + "");
-
 			java.sql.DatabaseMetaData meta = conn.getMetaData();
-			ResultSet res = meta.getTables(null, null, TranslatedPhrase.TABLE_NAME.replace('*', (char) num), null);
+			ResultSet res = meta.getTables(null, null, TranslatedPhrase.TABLE_NAME, null);
 			if (res.next() != false) {
 
 			} else {
@@ -338,7 +336,7 @@ public class MySQLHelper {
 	public static void insertTranslatedPhrase(TranslatedPhrase tp) {
 
 		int ch = tp.getEnglishPhrase().length();
-		String table = TranslatedPhrase.TABLE_NAME.replace("*", String.valueOf(ch));
+		String table = TranslatedPhrase.TABLE_NAME;
 		try {
 			conn = startSession();
 			// STEP 4: Execute a query

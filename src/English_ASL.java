@@ -1,7 +1,6 @@
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +23,8 @@ public class English_ASL extends HttpServlet {
 	List<List<Sign>> signList;
 	//
 	ArrayList<Sign> responseList;
-
+	//
+	ArrayList<TranslatedPhrase> savedPhrases;
 	private Translator translator;
 	private int serverAction = 0;
 	//
@@ -37,7 +37,7 @@ public class English_ASL extends HttpServlet {
 
 		signList = new ArrayList<List<Sign>>(26);
 		responseList = new ArrayList<Sign>();
-
+		savedPhrases = MySQLHelper.getAllTranslatedPhrases(TranslatedPhrase.TABLE_NAME);
 		for (char ch = 'a'; ch <= 'z'; ch++)
 			signList.add(ch - 'a', MySQLHelper.getAllSigns(Sign.TABLE_NAME.replace('*', ch)));
 		// TODO Auto-generated constructor stub
@@ -90,7 +90,7 @@ public class English_ASL extends HttpServlet {
 			TranslatedPhrase tp = new TranslatedPhrase(english, asl);
 
 			// Only creates if it does not exist
-			MySQLHelper.createTranslatedPhraseTable(english.length());
+			MySQLHelper.createTranslatedPhraseTable();
 
 			MySQLHelper.insertTranslatedPhrase(tp);
 
@@ -113,7 +113,7 @@ public class English_ASL extends HttpServlet {
 		// 2: Get Random Sign Information
 		case 2:
 
-			switch ((int) input.charAt(1)) {
+			switch (Integer.parseInt(input.substring(0, 2))) {
 			case 1:
 				// initiate a translator session
 				input = input.substring(2, input.length() - 1);
@@ -170,7 +170,22 @@ public class English_ASL extends HttpServlet {
 			writeSignsToResponseStream(responseList, responseStream);
 
 			break;
+
+		case 4:
+			ArrayList<TranslatedPhrase> phrases = new ArrayList<TranslatedPhrase>();
+			int currentNum = Integer.parseInt(input.substring(0, 2));
+			if (currentNum + 10 < savedPhrases.size()) {
+				for (int i = currentNum; i < currentNum + 10; i++) {
+					phrases.add(savedPhrases.get(i));
+				}
+			} else
+				for (int i = currentNum; i < savedPhrases.size(); i++) {
+					phrases.add(savedPhrases.get(i));
+				}
+			writeTranslatedPhrasesToResponseStream(phrases, responseStream);
+			break;
 		}
+
 		responseStream.flush();
 		responseStream.close();
 		responseList.clear();
@@ -225,6 +240,9 @@ public class English_ASL extends HttpServlet {
 		case 3:
 			serverAction = 3;
 			break;
+		case 4:
+			serverAction = 4;
+			break;
 
 		}
 		return input.substring(2, input.length());
@@ -240,13 +258,26 @@ public class English_ASL extends HttpServlet {
 	 * @param out
 	 */
 	public void writeSignsToResponseStream(ArrayList<Sign> list, OutputStreamWriter out) {
-		PrintWriter srvout;
-		srvout = new PrintWriter(System.out);
+
 		for (Sign sign : list) {
-			srvout.write(sign.getVideoUrl());
+
 			try {
 				out.write(sign.getLemmaValue() + " ");
 				out.write(sign.getVideoUrl() + "|");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public void writeTranslatedPhrasesToResponseStream(ArrayList<TranslatedPhrase> list, OutputStreamWriter out) {
+
+		for (TranslatedPhrase tp : list) {
+			try {
+				out.write("[");
+				out.write(tp.getEnglishPhrase() + " | ");
+				out.write(tp.getASLPhrase() + "]");
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

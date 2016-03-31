@@ -7,7 +7,7 @@
 public class TranslatedPhrase {
 
 	//
-	public static final String TABLE_NAME = "translatedPhraseLENGTH*";
+	public static final String TABLE_NAME = "translatedPhrase";
 	public static final String ENGLISH_COLUMN = "englishPhrase";
 
 	public static final String ASL_COLUMN = "aslPhrase";
