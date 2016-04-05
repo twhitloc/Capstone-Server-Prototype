@@ -17,6 +17,10 @@ import java.io.Serializable;
  */
 public class Sign implements Serializable {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 8749395526894163016L;
 	//
 	public static final String TABLE_NAME = "*Sign";
 	//
