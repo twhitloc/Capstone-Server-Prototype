@@ -12,8 +12,6 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
-import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedDependenciesAnnotation;
 import edu.stanford.nlp.trees.EnglishGrammaticalRelations;
 import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.PennTreebankLanguagePack;
@@ -160,21 +158,25 @@ public class Translator {
 			// please just try one!
 		} else {
 			pipeline.prettyPrint(annotation, System.out);
-			CoreMap sentence = sentences.get(0);
+			Tree sentence = sentences.get(0).get(TreeCoreAnnotations.TreeAnnotation.class);
 			String sentenceType = detectSentenceType(sentence);
 
 			switch (sentenceType) {
 
 			case "complex":
-
+				response = "complex";
 				break;
 			case "fragment":
-
+				response = "fragment";
 				break;
 			case "simple":
 				response = simpleSentenceTransformation(sentence);
 				break;
 			case "compound":
+				response = "compound";
+				break;
+			case "simpleQuestion":
+				response = simpleQuestionTransformation(sentence);
 
 				break;
 			}
@@ -183,7 +185,137 @@ public class Translator {
 		return response;
 	}
 
-	private String simpleSentenceTransformation(CoreMap sentence) {
+	public String identifyByClauseInformation(String input) {
+		String response = "";
+		Annotation annotation;
+		annotation = new Annotation(input);
+		pipeline.annotate(annotation);
+
+		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
+
+		pipeline.prettyPrint(annotation, System.out);
+		Tree sentence = sentences.get(0).get(TreeCoreAnnotations.TreeAnnotation.class);
+		response = detectSentenceType(sentence);
+		return response;
+	}
+
+	private String simpleQuestionTransformation(Tree sentence) {
+		// TODO Auto-generated method stub
+
+		String translation = "";
+		//
+		Boolean isCopulaPhrase = false;
+		//
+		Boolean isQuestion = false;
+		int numSubjects = 0;
+
+		IndexedWord nominalSubjectActor = new IndexedWord();
+		IndexedWord nominalSubjectAction = new IndexedWord();
+		IndexedWord questionTopic = new IndexedWord();
+		IndexedWord questionSubject = new IndexedWord();
+		IndexedWord indirectObject = new IndexedWord();
+		IndexedWord directObject = new IndexedWord();
+		IndexedWord determiner = new IndexedWord();
+
+		Boolean shortQuestion = false;
+		if (sentence.getLeaves().toString().contains("?")) {
+			isQuestion = true;
+		}
+
+		if (sentence.getLeaves().size() < 6 && isQuestion) {
+			shortQuestion = true;
+		}
+		// get the language pack
+		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
+		// create a grammatical structure object using language pack
+		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(sentence);
+
+		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
+		System.out.println("typedDeps ==>  " + typedDeps);
+
+		for (TypedDependency td : typedDeps) {
+			IndexedWord dependent = td.dep();
+			IndexedWord governor = td.gov();
+			String depStr = dependent.toString();
+			String govStr = governor.toString();
+			switch (td.reln().toString()) {
+
+			// Nominal Subject
+			case "nsubj":
+
+				nominalSubjectActor = dependent;
+				nominalSubjectAction = governor;
+				break;
+
+			// Sentence Root
+			case "root":
+				// rootVerb = dependent;
+				break;
+
+			// Determiner
+			case "det":
+				if (dependent.toString().contains("a") || dependent.toString().contains("an")
+						|| dependent.toString().contains("the") && sentence.getLeaves().size() < 5) {
+				} else {
+					determiner = dependent;
+				}
+				break;
+
+			case "nmod:poss":
+
+				questionSubject = dependent;
+				questionTopic = governor;
+				break;
+			// Indirect Object
+			case "iobj":
+				indirectObject = dependent;
+				break;
+			// Direct Object
+			case "dobj":
+				directObject = dependent;
+				break;
+
+			// Copula
+			case "cop":
+				isCopulaPhrase = true;
+				directObject = governor;
+				break;
+			default:
+				System.out.println(td);
+				break;
+			}
+		}
+
+		// if the sentence is a declaration statement * ie : "I am a student"
+		if (shortQuestion && questionSubject.size() != 0 && questionTopic.size() != 0) {
+			if (questionSubject.index() > questionTopic.index()) {
+				translation = questionSubject.lemma().toString() + " " + questionTopic.lemma().toString();
+			} else
+				translation = questionTopic.lemma().toString() + " " + questionSubject.lemma().toString();
+
+			// If there is an indirect object and direct object
+		} else if (nominalSubjectActor.size() != 0 && indirectObject.size() != 0 && directObject.size() != 0
+				&& nominalSubjectAction.size() != 0) {
+
+			translation = nominalSubjectActor.lemma().toString() + " " + indirectObject.lemma().toString() + " "
+					+ directObject.lemma().toString() + " " + nominalSubjectAction.lemma().toString();
+
+			// if there is a direct object without an indirect object
+		} else if (nominalSubjectActor.size() != 0 && directObject.size() != 0 && nominalSubjectAction.size() != 0) {
+			translation = nominalSubjectActor.lemma().toString() + " " + nominalSubjectAction.lemma().toString() + " "
+					+ directObject.lemma().toString();
+		}
+
+		if (isQuestion) {
+			translation = translation + " questioning";
+		}
+		// SemanticGraph collDeps =
+		// sentence.get(CollapsedDependenciesAnnotation.class);
+
+		return translation;
+	}
+
+	private String simpleSentenceTransformation(Tree tree) {
 		String translation = "";
 		//
 		Boolean isCopulaPhrase = false;
@@ -203,8 +335,6 @@ public class Translator {
 		IndexedWord directObject = new IndexedWord();
 		IndexedWord determiner = new IndexedWord();
 
-		// get the tree that represents the sentence as a whole
-		Tree tree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
 		// get the language pack
 		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
 		// create a grammatical structure object using language pack
@@ -224,7 +354,7 @@ public class Translator {
 
 			// Nominal Subject
 			case "nsubj":
-				System.out.println(td);
+
 				nominalSubjectActor = dependent;
 				nominalSubjectAction = governor;
 				break;
@@ -237,7 +367,7 @@ public class Translator {
 			// Determiner
 			case "det":
 				if (dependent.toString().contains("a") || dependent.toString().contains("an")
-						|| dependent.toString().contains("the") && sentence.size() < 5) {
+						|| dependent.toString().contains("the") && tree.getLeaves().size() < 5) {
 					// rootVerb = null;
 					// for now just ignore the articles
 					// RootVerb may be wrong in this case?
@@ -284,18 +414,8 @@ public class Translator {
 					+ directObject.lemma().toString();
 		}
 
-		SemanticGraph collDeps = sentence.get(CollapsedDependenciesAnnotation.class);
-
-		/*
-		 * Tree prev = tree; int y = 0; // go through the tree one level at a
-		 * time for (int i = 0; i < tree.depth(); i++) { Tree temp; temp =
-		 * prev.firstChild(); List<Tree> list = prev.getChildrenAsList();
-		 * List<Tree> nodei = tree.getLeaves(); switch (temp.nodeString()) {
-		 * case "nsubj": System.out.println("Here"); break; case "S":
-		 * System.out.println("Here"); numSubjects = list.size(); break; }
-		 * String str = temp.nodeString(); Tree[] child = temp.children(); prev
-		 * = temp; y++; }
-		 */
+		// SemanticGraph collDeps =
+		// sentence.get(CollapsedDependenciesAnnotation.class);
 
 		return translation;
 	}
@@ -392,38 +512,245 @@ public class Translator {
 	 * @param sentence
 	 * @return
 	 */
-	public String detectSentenceType(CoreMap sentence) {
-
-		Tree tree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
-
+	public String detectSentenceType(Tree tree) {
 		String response = "";
 		int numberOfClauses = 0;
 		numberOfClauses = getNumberOfClauses(tree);
 
-		if (numberOfClauses < 2) {
-			if (isSimple(sentence)) {
+		if (numberOfClauses == 0) {
+			response = "fragment";
+		} else if (numberOfClauses == 1) {
+
+			if (isSimpleWHQuestion(tree)) {
+				response = "simpleQuestion";
+			} else if (isSimple(tree)) {
 				response = "simple";
 			}
-			if (isSimpleWHQuestion(sentence)) {
-				response = "simpleQuestion";
-			}
-		} else if (numberOfClauses > 2) {
-			if (isCompound(sentence)) {
 
-				response = "compound";
-			} else if (isComplex(sentence)) {
+		}
 
-				response = "complex";
+		if (numberOfClauses >= 1) {
+
+			Tree subtree = tree;
+			boolean hasSubordinating = false;
+			boolean hasFrag = false;
+			boolean hasCoordinating = false;
+			String leaves = tree.getLeaves().toString();
+
+			if (tree.getLeaves().toString().contains(";")) {
+				String treeString = tree.getLeaves().toString();
+				if (treeString.indexOf(";") != treeString.length() - 2)
+					return "compound";
 			}
-		} else {
-			response = "fragment";
+
+			TregexPattern pat = TregexPattern.compile("@CONJP");
+			TregexMatcher matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				return "compound";
+			}
+
+			pat = TregexPattern.compile("@CC");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				return "compound";
+			}
+
+			pat = TregexPattern.compile("@PP");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				pat = TregexPattern.compile("@IN");
+				matcher = pat.matcher(matcher.getMatch());
+				if (matcher.find()) {
+					hasSubordinating = true;
+				}
+			}
+
+			pat = TregexPattern.compile("@SBAR");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				pat = TregexPattern.compile("@IN");
+				matcher = pat.matcher(tree);
+				if (matcher.find()) {
+					return "compound";
+				}
+			}
+
+			if (numberOfClauses >= 2) {
+
+				// if coordination has not been detected, perhaps it is because
+				// "yet" does not always classify as CC
+				// Check to see if yet is being used as CC
+				hasCoordinating = hasYetCoordination(tree);
+				if (hasCoordinating) {
+					return "compound";
+				}
+
+				int numNP = 0;
+				pat = TregexPattern.compile("@NP");
+				matcher = pat.matcher(tree);
+				if (matcher.find()) {
+					numNP++;
+					if (matcher.findNextMatchingNode()) {
+						numNP++;
+					}
+				}
+
+				pat = TregexPattern.compile("@FRAG");
+				matcher = pat.matcher(tree);
+				if (matcher.find()) {
+					hasFrag = true;
+				}
+
+				if (numNP > 1 || hasFrag) {
+					response = "complex";
+				}
+			}
+
 		}
 		return response;
+
 	}
 
-	private boolean isSimpleWHQuestion(CoreMap sentence) {
+	private boolean hasYetCoordination(Tree tree) {
+		TregexPattern pat;
+		TregexMatcher matcher;
+		Tree subtree;
+		ArrayList<Tree> clauses = new ArrayList<Tree>();
+		List<Tree> children = tree.firstChild().getChildrenAsList();
+		boolean ret = false;
+
+		pat = TregexPattern.compile("@S");
+		matcher = pat.matcher(tree);
+		if (matcher.find()) {
+			subtree = matcher.getMatch();
+			matcher = pat.matcher(subtree.firstChild());
+			if (!matcher.findNextMatchingNode()) {
+				clauses.add(subtree);
+			}
+			matcher = pat.matcher(tree);
+			while (matcher.findNextMatchingNode()) {
+				subtree = matcher.getMatch();
+				matcher = pat.matcher(subtree.firstChild());
+				if (!matcher.find()) {
+					clauses.add(subtree);
+				}
+			}
+		}
+		if (tree.getLeaves().toString().contains("yet")) {
+			boolean emptyCommaTree = false;
+			for (Tree child : children) {
+				String childLabel = child.label().value().toString();
+				if (childLabel.contains(",")) {
+					if (child.getChildrenAsList().size() == 1) {
+						emptyCommaTree = true;
+					}
+				} else if (emptyCommaTree) {
+
+					if (child.firstChild().getLeaves().toString().contains("yet")) {
+						ret = true;
+					}
+					emptyCommaTree = false;
+				}
+			}
+
+		}
+		for (Tree clause : clauses) {
+			if (clause.getLeaves().toString().contains("yet")) {
+				ret = false;
+			}
+		}
+		return ret;
+	}
+
+	private boolean isSimpleWHQuestion(Tree tree) {
 		// TODO Auto-generated method stub
+		Boolean isWHQuestion = false;
+		Boolean hasSBARQ = false;
+		Boolean hasWHNP = false;
+		Boolean isCopular = false;
+		// Nominal Subject
+		Boolean hasNSUBJ = false;
+		Boolean hasRoot = false;
+		Boolean isQuestion = false;
+
+		// SQ - Inverted yes/no question, or main clause of a wh-question,
+		// following the wh-phrase in SBARQ.
+		Boolean hasSQ = false;
+
+		if (tree.getLeaves().toString().contains("?")) {
+			isQuestion = true;
+
+		}
+
+		TregexPattern pat = TregexPattern.compile("@SBARQ");
+		TregexMatcher matcher = pat.matcher(tree);
+		Tree subtree = tree;
+		if (matcher.find()) {
+			hasSBARQ = true;
+			subtree = matcher.getMatch();
+		}
+		pat = TregexPattern.compile("@SQ");
+		matcher = pat.matcher(subtree);
+		if (matcher.find()) {
+			hasSQ = true;
+		}
+
+		pat = TregexPattern.compile("@WHNP");
+		matcher = pat.matcher(subtree);
+		if (matcher.find()) {
+			subtree = matcher.getMatch();
+			hasWHNP = true;
+		}
+
+		int x = 1;
+		x++;
+
+		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
+
+		// create a grammatical structure object using language pack
+		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(tree);
+
+		// get typed dependencies
+		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
+
+		for (TypedDependency td : typedDeps) {
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_SUBJECT.toString())
+					|| td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_PASSIVE_SUBJECT.toString())) {
+				hasNSUBJ = true;
+
+			}
+			// if there is a coordinating conjunction it cannot be a simple
+			// sentence
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.COORDINATION.toString())) {
+				return false;
+			}
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.COPULA.toString())) {
+				isCopular = true;
+			}
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.DIRECT_OBJECT.toString())) {
+
+			}
+
+			if (td.reln().toString().contains("root")) {
+				hasRoot = true;
+			}
+			// ??
+			if (td.reln().toString().equals("punct")) {
+
+			}
+		}
+
+		if (isQuestion && hasNSUBJ && hasRoot) {
+			return true;
+		}
+
+		// nested if stuff
+
 		return false;
+
 	}
 
 	/**
@@ -450,7 +777,7 @@ public class Translator {
 		for (Tree tree : sentence) {
 			// Identify Clause Level Tags!
 
-			if (tree.label().value().equals("S")) {
+			if (tree.label().value().equals("S") && !(tree.firstChild().label().value().equals("SBAR"))) {
 				numClauses++;
 			} else if (tree.label().value().equals("SBAR")) {
 				numClauses++;
@@ -472,28 +799,16 @@ public class Translator {
 		// Nominal subject is a noun phrase (NP) which is the subject of the
 		// clause
 		Boolean hasNominalSubject = false;
-
 		Boolean hasPersonalPronoun = false;
-
 		Boolean hasCopula = false;
 		// grammatical root of the sentence
 		Boolean hasRoot = false;
-
 		// relation of the head of a noun phrase (NP) and its determiner
 		Boolean hasDeterminer = false;
-
-		//
 		Boolean hasIndirectObject = false;
-
-		//
 		Boolean hasDirectObject = false;
-
-		//
 		Boolean hasNounPhrase = false;
-
-		//
 		Boolean hasVerbPhrase = false;
-
 		Boolean hasCoordinatingConjunction = false;
 
 		// get the language pack
@@ -518,7 +833,7 @@ public class Translator {
 			if (td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_SUBJECT.toString())
 					|| td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_PASSIVE_SUBJECT.toString())) {
 				hasNominalSubject = true;
-				System.out.println(td);
+
 			}
 			// if there is a coordinating conjunction it cannot be a simple
 			// sentence
@@ -571,57 +886,13 @@ public class Translator {
 		return false;
 	}
 
-	public Boolean isCompound(CoreMap sentence) {
+	public Boolean isCompound(Tree tree) {
 
 		return false;
 	}
 
-	public Boolean isComplex(CoreMap sentence) {
+	public Boolean isComplex(Tree tree) {
 		// must have independent >1 and dependent clause >=0
 		return false;
 	}
 }
-
-/**
- * Tree tree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
- * CollinsHeadFinder headFinder = new CollinsHeadFinder();
- * headFinder.determineHead(tree); SemanticGraph basicDeps =
- * sentence.get(BasicDependenciesAnnotation.class); Collection
- * <TypedDependency> typedDeps = basicDeps.typedDependencies();
- * System.out.println("typedDeps ==>  " + typedDeps);
- * 
- * SemanticGraph collDeps = sentence.get(CollapsedDependenciesAnnotation.class);
- * SemanticGraph collCCDeps =
- * sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
- * 
- * List<CoreMap> numerizedTokens =
- * sentence.get(NumerizedTokensAnnotation.class); List<CoreLabel> tokens =
- * sentence.get(CoreAnnotations.TokensAnnotation.class);
- * 
- * Tree sentenceTree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
- * 
- * // find nounPhrases in sentence TregexPattern pat =
- * TregexPattern.compile("@NP"); TregexMatcher matcher =
- * pat.matcher(sentenceTree); while (matcher.find()) { Tree nounPhraseTree =
- * matcher.getMatch(); System.out.println("Found noun phrase " +
- * nounPhraseTree);
- * 
- * nounPhraseTree.percolateHeads(headFinder); Tree head =
- * nounPhraseTree.headTerminal(headFinder); CoreLabel headLabel = (CoreLabel)
- * head.label();
- * 
- * System.out.println("tokens.contains(headLabel)" +
- * tokens.contains(headLabel));
- * 
- * System.out.println(""); System.out.println("Iterating over typed deps"); for
- * (TypedDependency typedDependency : typedDeps) {
- * System.out.println(typedDependency.gov().backingLabel()); System.out.println(
- * "gov pos " + typedDependency.gov() + " - " + typedDependency.gov().index());
- * System.out.println("dep pos " + typedDependency.dep() + " - " +
- * typedDependency.dep().index());
- * 
- * if (typedDependency.gov().index() == headLabel.index()) {
- * 
- * System.out.println( " !!!!!!!!!!!!!!!!!!!!!  HIT ON " + headLabel + " == " +
- * typedDependency.gov()); } } }
- */
