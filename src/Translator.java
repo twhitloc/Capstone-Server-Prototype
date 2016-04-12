@@ -35,6 +35,13 @@ public class Translator {
 	private StanfordCoreNLP pipeline;
 	private ArrayList<String> lemmas;
 
+	private String[] subordinatingConjunctionWords = { "after", "although", "as", "because", "before", "even",
+			"even if", "even though", "if", "lest", "now", "once", "provided", "supposing", "rather", "since", "that",
+			"than", "though", "til", "unless", "until", "which", "when", "whenever", "where", "whereas", "whether",
+			"who", "whoever", "why", "wherever", "while",
+
+	};
+
 	public Translator(List<List<Sign>> list) {
 		if (list != null) {
 			signList = list;
@@ -515,7 +522,22 @@ public class Translator {
 	public String detectSentenceType(Tree tree) {
 		String response = "";
 		int numberOfClauses = 0;
+		boolean commaHasChildPrep = false;
 		numberOfClauses = getNumberOfClauses(tree);
+		String matchStr;
+		ArrayList<Tree> clauseList = new ArrayList<Tree>();
+		ArrayList<Tree> completeClauses = new ArrayList<Tree>();
+		ArrayList<Tree> coordinatingConjunctions = new ArrayList<Tree>();
+		ArrayList<Tree> nounPhrases = new ArrayList<Tree>();
+		ArrayList<Tree> verbPhrases = new ArrayList<Tree>();
+		Tree x;
+		Tree y;
+		TregexPattern pat = TregexPattern.compile("@S");
+		TregexMatcher matcher = pat.matcher(tree.firstChild());
+		TregexPattern subjunctiveAdverb;
+
+		completeClauses = getCompleteClauses(tree.firstChild());
+		clauseList = getClauseList(tree.firstChild());
 
 		if (numberOfClauses == 0) {
 			response = "fragment";
@@ -531,11 +553,27 @@ public class Translator {
 
 		if (numberOfClauses >= 1) {
 
-			Tree subtree = tree;
-			boolean hasSubordinating = false;
+			int numNP = 0;
+			pat = TregexPattern.compile("@NP");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				nounPhrases.add(matcher.getMatch());
+				while (matcher.findNextMatchingNode()) {
+					nounPhrases.add(matcher.getMatch());
+				}
+			}
+
+			pat = TregexPattern.compile("@VP");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				verbPhrases.add(matcher.getMatch());
+				while (matcher.findNextMatchingNode()) {
+					verbPhrases.add(matcher.getMatch());
+				}
+			}
+
 			boolean hasFrag = false;
 			boolean hasCoordinating = false;
-			String leaves = tree.getLeaves().toString();
 
 			if (tree.getLeaves().toString().contains(";")) {
 				String treeString = tree.getLeaves().toString();
@@ -543,13 +581,7 @@ public class Translator {
 					return "compound";
 			}
 
-			TregexPattern pat = TregexPattern.compile("@CONJP");
-			TregexMatcher matcher = pat.matcher(tree);
-			if (matcher.find()) {
-				return "compound";
-			}
-
-			pat = TregexPattern.compile("@CC");
+			pat = TregexPattern.compile("@CONJP");
 			matcher = pat.matcher(tree);
 			if (matcher.find()) {
 				return "compound";
@@ -559,20 +591,167 @@ public class Translator {
 			matcher = pat.matcher(tree);
 			if (matcher.find()) {
 				pat = TregexPattern.compile("@IN");
-				matcher = pat.matcher(matcher.getMatch());
+				x = matcher.getMatch();
+				matcher = pat.matcher(x);
 				if (matcher.find()) {
-					hasSubordinating = true;
+					x = matcher.getMatch();
+
+					boolean containedInNP = false;
+					boolean containedInVP = false;
+					for (Tree nPhrase : nounPhrases) {
+						if (nPhrase.contains(x)) {
+							containedInNP = true;
+						}
+					}
+					for (Tree vPhrase : verbPhrases) {
+						if (vPhrase.contains(x)) {
+							containedInNP = true;
+						}
+					}
+					if (!containedInNP && !containedInVP) {
+						matchStr = x.firstChild().value().toLowerCase();
+
+						for (String str : subordinatingConjunctionWords) {
+							if (matchStr.contains(str)) {
+								return "complex";
+							}
+						}
+					}
+				}
+
+				subjunctiveAdverb = TregexPattern.compile("@WHADVP");
+				matcher = subjunctiveAdverb.matcher(x);
+				if (matcher.find()) {
+					x = matcher.getMatch();
+					if (x.firstChild().value().toString() != "") {
+						matchStr = x.firstChild().firstChild().value().toLowerCase();
+						for (String str : subordinatingConjunctionWords) {
+							if (matchStr.contains(str)) {
+								return "complex";
+							}
+						}
+					}
 				}
 			}
 
 			pat = TregexPattern.compile("@SBAR");
 			matcher = pat.matcher(tree);
 			if (matcher.find()) {
+				// pattern preposition
+				x = matcher.getMatch();
 				pat = TregexPattern.compile("@IN");
-				matcher = pat.matcher(tree);
+				matcher = pat.matcher(x);
 				if (matcher.find()) {
+					y = matcher.getMatch();
+
+					boolean containedInNP = false;
+					boolean containedInVP = false;
+					for (Tree nPhrase : nounPhrases) {
+						if (nPhrase.contains(y)) {
+							containedInNP = true;
+						}
+					}
+					for (Tree vPhrase : verbPhrases) {
+						if (vPhrase.contains(y)) {
+
+							containedInNP = true;
+						}
+					}
+					if (!containedInNP && !containedInVP) {
+						matchStr = y.firstChild().value().toLowerCase();
+
+						for (String str : subordinatingConjunctionWords) {
+							if (matchStr.contains(str)) {
+								return "complex";
+							}
+						}
+					} else if (containedInNP || containedInVP) {
+						int j = 0;
+						if (x.size() > (j = x.objectIndexOf(y))) {
+							matchStr = x.getChild(++j).label().value().toString();
+							if (matchStr.contains("S")) {
+								return "complex";
+							}
+						}
+					}
+				}
+				subjunctiveAdverb = TregexPattern.compile("@WHADVP");
+				matcher = subjunctiveAdverb.matcher(x);
+				if (matcher.find()) {
+					x = matcher.getMatch();
+					if (x.firstChild().value().toString() != "") {
+						matchStr = x.firstChild().firstChild().value().toLowerCase();
+						for (String str : subordinatingConjunctionWords) {
+							if (matchStr.contains(str)) {
+								return "complex";
+							}
+						}
+					}
+				}
+
+			}
+
+			pat = TregexPattern.compile("@/,/");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				boolean commaInClause = false;
+				boolean prepInClause = false;
+				x = matcher.getMatch();
+				int indexX = tree.firstChild().objectIndexOf(x);
+				if (indexX < tree.firstChild().size()) {
+
+					y = tree.firstChild().getChild(indexX + 1);
+					pat = TregexPattern.compile("@IN");
+					matcher = pat.matcher(y);
+					if (matcher.find()) {
+						for (Tree clause : clauseList) {
+							if (clause.contains(x)) {
+								commaInClause = true;
+							}
+							if (clause.contains(y)) {
+								prepInClause = true;
+							}
+						}
+
+						if (y == matcher.getMatch() && (!commaInClause && !prepInClause)) {
+							response = "compound";
+							commaHasChildPrep = true;
+						}
+					}
+				}
+			}
+
+			pat = TregexPattern.compile("@CC");
+			matcher = pat.matcher(tree);
+			if (matcher.find()) {
+				boolean isEmbeddedInClause = false;
+				coordinatingConjunctions.add(matcher.getMatch());
+				while (matcher.findNextMatchingNode()) {
+					coordinatingConjunctions.add(matcher.getMatch());
+				}
+
+				int numConjunctions = coordinatingConjunctions.size(), counter = 0, tracker = 0,
+						numConjunctionsInClauses = 0;
+
+				for (int i = 0; i < nounPhrases.size(); i++) {
+					Tree temp = nounPhrases.get(i);
+
+					for (counter = 0; counter < coordinatingConjunctions.size(); counter++) {
+						if (temp.contains(coordinatingConjunctions.get(counter))) {
+							numConjunctionsInClauses++;
+							coordinatingConjunctions.remove(counter);
+						}
+
+					}
+				}
+
+				if ((numConjunctions - numConjunctionsInClauses) > 0 && coordinatingConjunctions.size() > 0
+						|| commaHasChildPrep) {
 					return "compound";
 				}
+				// see if cases like "and" are used as coordinating conjunctions
+				// in compound sentences
+
 			}
 
 			if (numberOfClauses >= 2) {
@@ -583,16 +762,6 @@ public class Translator {
 				hasCoordinating = hasYetCoordination(tree);
 				if (hasCoordinating) {
 					return "compound";
-				}
-
-				int numNP = 0;
-				pat = TregexPattern.compile("@NP");
-				matcher = pat.matcher(tree);
-				if (matcher.find()) {
-					numNP++;
-					if (matcher.findNextMatchingNode()) {
-						numNP++;
-					}
 				}
 
 				pat = TregexPattern.compile("@FRAG");
@@ -607,8 +776,42 @@ public class Translator {
 			}
 
 		}
+		if (response == "") {
+			response = "compound complex";
+		}
 		return response;
 
+	}
+
+	private ArrayList<Tree> getCompleteClauses(Tree sentence) {
+
+		ArrayList<Tree> t = new ArrayList<Tree>();
+		for (Tree tree : sentence) {
+			// Identify Clause Level Tags!
+
+			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
+					|| tree.firstChild().label().value().equals("S")))) {
+				t.add(tree);
+			}
+		}
+		return t;
+	}
+
+	private ArrayList<Tree> getClauseList(Tree sentence) {
+
+		ArrayList<Tree> t = new ArrayList<Tree>();
+		for (Tree tree : sentence) {
+			// Identify Clause Level Tags!
+
+			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
+					|| tree.firstChild().label().value().equals("S")))) {
+				t.add(tree);
+
+			} else if (tree.label().value().equals("SINV")) {
+				t.add(tree);
+			}
+		}
+		return t;
 	}
 
 	private boolean hasYetCoordination(Tree tree) {
@@ -773,21 +976,19 @@ public class Translator {
 	 */
 	public int getNumberOfClauses(Tree sentence) {
 		int numClauses = 0;
-
 		for (Tree tree : sentence) {
 			// Identify Clause Level Tags!
 
-			if (tree.label().value().equals("S") && !(tree.firstChild().label().value().equals("SBAR"))) {
+			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
+					|| tree.firstChild().label().value().equals("S")))) {
 				numClauses++;
-			} else if (tree.label().value().equals("SBAR")) {
-				numClauses++;
-			} else if (tree.label().value().equals("SBARQ")) {
-				numClauses++;
+
 			} else if (tree.label().value().equals("SINV")) {
 				numClauses++;
 			}
 		}
 		return numClauses;
+
 	}
 
 	public Boolean isSimple(Tree tree) {

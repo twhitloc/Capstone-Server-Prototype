@@ -81,8 +81,28 @@ public class Translator_Test {
 	public void testIdentifyComplexByClauseInformation() {
 		Translator translator = new Translator();
 
-		String input = "Because my coffee was too cold, I heated it in the microwave.";
+		String input = "Because Mary and Samantha arrived at the bus station before noon, I did not see them at the station.";
 		String output = translator.identifyByClauseInformation(input);
+		assertEquals("complex", output);
+
+		input = "While he waited at the train station, Joe realized that the train was late.";
+		output = translator.identifyByClauseInformation(input);
+		assertEquals("complex", output);
+
+		input = "After they left on the bus, Mary and Samantha realized that Joe was waiting at the train station.";
+		output = translator.identifyByClauseInformation(input);
+		assertEquals("complex", output);
+
+		input = "I did not see them at the station because Mary and Samantha arrived at the bus station before noon.";
+		output = translator.identifyByClauseInformation(input);
+		assertEquals("complex", output);
+
+		input = "Joe realized that the train was late while he waited at the train station.";
+		output = translator.identifyByClauseInformation(input);
+		assertEquals("complex", output);
+
+		input = "Mary and Samantha realized that Joe was waiting at the train station after they left on the bus.";
+		output = translator.identifyByClauseInformation(input);
 		assertEquals("complex", output);
 
 		input = "Though he was very rich, he was still very unhappy.";
@@ -118,19 +138,69 @@ public class Translator_Test {
 	public void testIdentifyCompoundByClauseInformation() {
 		Translator translator = new Translator();
 
-		String input = "She did not cheat on the test, for it was not the right thing to do.";
-		String output = translator.identifyByClauseInformation(input);
+		String input;
+		String output;
+
+		// "Mary
+		// and
+		// Samantha
+		// arrived
+		// at
+		// the
+		// bus
+		// station
+		// before
+		// noon,
+		// and
+		// they
+		// left
+		// on
+		// the
+		// bus
+		// before
+		// I
+		// arrived.";
+		// //
+
+		// "Mary and
+		// Samantha
+		// arrived
+		// at the
+		// bus
+		// station
+		// before
+		// noon, and
+		// they left
+		// on the
+		// bus
+		// before I
+		// arrived.";
+		// //
+
+		// "Mary and
+		// Samantha
+		// left on
+		// the bus
+		// before I
+		// arrived,
+		// so I did
+		// not see
+		// them at
+		// the bus
+		// station.";
+		input = "John bought some new shoes and wore them to a party.";
+		output = translator.identifyByClauseInformation(input); //
 		assertEquals("compound", output);
 
-		input = "I really want to go to work, but I am too sick to drive.";
+		input = "Joe waited for the train, but the train was late.";
 		output = translator.identifyByClauseInformation(input);
 		assertEquals("compound", output);
 
-		input = "There was no ice cream in the freezer, nor did they have money to go to the store.";
+		input = "Lydia liked her new house but not the front yard.";
 		output = translator.identifyByClauseInformation(input);
 		assertEquals("compound", output);
 
-		input = "Should we start class now, or should we wait for everyone to get here?";
+		input = "We can go see a movie or get something to eat.";
 		output = translator.identifyByClauseInformation(input);
 		assertEquals("compound", output);
 
