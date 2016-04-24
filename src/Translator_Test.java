@@ -50,6 +50,19 @@ public class Translator_Test {
 
 	}
 
+	@Test
+	public void testTransformNounPhrase() {
+		Translator translator = new Translator();
+		// "John is looking for a man to fix the garage";
+		String input = "John is looking for a book.";
+		String output = translator.translate(input);
+		assertEquals("john look for book.", output.toLowerCase());
+
+		input = "John is looking for the book.";
+		output = translator.translate(input);
+		assertEquals("john look for book.", output.toLowerCase());
+	}
+
 	/**
 	 * 
 	 */
@@ -59,12 +72,9 @@ public class Translator_Test {
 		Translator translator = new Translator();
 
 		String input = "What is your name?";
-		String output;// = translator.translate(input);
-		// assertEquals("you name questioning", output.toLowerCase());
+		String output = translator.translate(input);
+		assertEquals("you name what questioning", output.toLowerCase());
 
-		input = "Your name is what?";
-		output = translator.translate(input);
-		assertEquals("name you questioning", output);
 	}
 
 	@Test
@@ -74,7 +84,7 @@ public class Translator_Test {
 
 		String input = "Are you deaf?";
 		String output = translator.translate(input);
-		assertEquals("deaf you quesitoning", output.toLowerCase());
+		assertEquals("deaf you questioning", output.toLowerCase());
 	}
 
 	@Test
@@ -141,53 +151,6 @@ public class Translator_Test {
 		String input;
 		String output;
 
-		// "Mary
-		// and
-		// Samantha
-		// arrived
-		// at
-		// the
-		// bus
-		// station
-		// before
-		// noon,
-		// and
-		// they
-		// left
-		// on
-		// the
-		// bus
-		// before
-		// I
-		// arrived.";
-		// //
-
-		// "Mary and
-		// Samantha
-		// arrived
-		// at the
-		// bus
-		// station
-		// before
-		// noon, and
-		// they left
-		// on the
-		// bus
-		// before I
-		// arrived.";
-		// //
-
-		// "Mary and
-		// Samantha
-		// left on
-		// the bus
-		// before I
-		// arrived,
-		// so I did
-		// not see
-		// them at
-		// the bus
-		// station.";
 		input = "John bought some new shoes and wore them to a party.";
 		output = translator.identifyByClauseInformation(input); //
 		assertEquals("compound", output);

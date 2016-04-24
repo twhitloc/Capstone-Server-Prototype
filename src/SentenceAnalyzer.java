@@ -10,7 +10,6 @@ import edu.stanford.nlp.trees.TreebankLanguagePack;
 import edu.stanford.nlp.trees.TypedDependency;
 import edu.stanford.nlp.trees.tregex.TregexMatcher;
 import edu.stanford.nlp.trees.tregex.TregexPattern;
-import edu.stanford.nlp.util.CoreMap;
 
 public class SentenceAnalyzer {
 
@@ -48,14 +47,15 @@ public class SentenceAnalyzer {
 
 		completeClauses = getCompleteClauses(tree.firstChild());
 		clauseList = getClauseList(tree.firstChild());
-
 		if (numberOfClauses == 0) {
 			response = "fragment";
-		} else if (numberOfClauses == 1) {
+		} else if (isSimpleQuestion(tree)) {
+			response = "simpleQuestion";
+		}
 
-			if (isSimpleWHQuestion(tree)) {
-				response = "simpleQuestion";
-			} else if (isSimple(tree)) {
+		if (numberOfClauses == 1) {
+
+			if (isSimple(tree)) {
 				response = "simple";
 			}
 
@@ -64,23 +64,8 @@ public class SentenceAnalyzer {
 		if (numberOfClauses >= 1) {
 
 			int numNP = 0;
-			pat = TregexPattern.compile("@NP");
-			matcher = pat.matcher(tree);
-			if (matcher.find()) {
-				nounPhrases.add(matcher.getMatch());
-				while (matcher.findNextMatchingNode()) {
-					nounPhrases.add(matcher.getMatch());
-				}
-			}
-
-			pat = TregexPattern.compile("@VP");
-			matcher = pat.matcher(tree);
-			if (matcher.find()) {
-				verbPhrases.add(matcher.getMatch());
-				while (matcher.findNextMatchingNode()) {
-					verbPhrases.add(matcher.getMatch());
-				}
-			}
+			nounPhrases = getPhraseListByTag(tree, "NP");
+			verbPhrases = getPhraseListByTag(tree, "VP");
 
 			boolean hasFrag = false;
 			boolean hasCoordinating = false;
@@ -293,6 +278,52 @@ public class SentenceAnalyzer {
 
 	}
 
+	static ArrayList<Tree> getPhraseListByTag(Tree tree, String pattern) {
+		ArrayList<Tree> phrases = new ArrayList<Tree>();
+		// TODO Auto-generated method stub
+		TregexPattern pat = TregexPattern.compile(pattern);
+		TregexMatcher matcher = pat.matcher(tree);
+		if (matcher.find()) {
+			phrases.add(matcher.getMatch());
+			while (matcher.findNextMatchingNode()) {
+				phrases.add(matcher.getMatch());
+			}
+		}
+
+		return phrases;
+	}
+
+	private static ArrayList<Tree> getClauseList(Tree sentence) {
+
+		ArrayList<Tree> t = new ArrayList<Tree>();
+		for (Tree tree : sentence) {
+			// Identify Clause Level Tags!
+
+			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
+					|| tree.firstChild().label().value().equals("S")))) {
+				t.add(tree);
+
+			} else if (tree.label().value().equals("SINV")) {
+				t.add(tree);
+			}
+		}
+		return t;
+	}
+
+	private static ArrayList<Tree> getCompleteClauses(Tree sentence) {
+
+		ArrayList<Tree> t = new ArrayList<Tree>();
+		for (Tree tree : sentence) {
+			// Identify Clause Level Tags!
+
+			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
+					|| tree.firstChild().label().value().equals("S")))) {
+				t.add(tree);
+			}
+		}
+		return t;
+	}
+
 	/**
 	 * Returns the number of clauses in the CoreMap object.
 	 * 
@@ -307,8 +338,9 @@ public class SentenceAnalyzer {
 			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
 					|| tree.firstChild().label().value().equals("S")))) {
 				numClauses++;
-
 			} else if (tree.label().value().equals("SINV")) {
+				numClauses++;
+			} else if (tree.label().value().equals("SQ")) {
 				numClauses++;
 			}
 		}
@@ -365,140 +397,6 @@ public class SentenceAnalyzer {
 			}
 		}
 		return ret;
-	}
-
-	private static ArrayList<Tree> getClauseList(Tree sentence) {
-
-		ArrayList<Tree> t = new ArrayList<Tree>();
-		for (Tree tree : sentence) {
-			// Identify Clause Level Tags!
-
-			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
-					|| tree.firstChild().label().value().equals("S")))) {
-				t.add(tree);
-
-			} else if (tree.label().value().equals("SINV")) {
-				t.add(tree);
-			}
-		}
-		return t;
-	}
-
-	private static ArrayList<Tree> getCompleteClauses(Tree sentence) {
-
-		ArrayList<Tree> t = new ArrayList<Tree>();
-		for (Tree tree : sentence) {
-			// Identify Clause Level Tags!
-
-			if (tree.label().value().equals("S") && (!(tree.firstChild().label().value().equals("SBAR")
-					|| tree.firstChild().label().value().equals("S")))) {
-				t.add(tree);
-			}
-		}
-		return t;
-	}
-
-	private static boolean isSimpleWHQuestion(Tree tree) {
-		// TODO Auto-generated method stub
-		Boolean isWHQuestion = false;
-		Boolean hasSBARQ = false;
-		Boolean hasWHNP = false;
-		Boolean isCopular = false;
-		// Nominal Subject
-		Boolean hasNSUBJ = false;
-		Boolean hasRoot = false;
-		Boolean isQuestion = false;
-
-		// SQ - Inverted yes/no question, or main clause of a wh-question,
-		// following the wh-phrase in SBARQ.
-		Boolean hasSQ = false;
-
-		if (tree.getLeaves().toString().contains("?")) {
-			isQuestion = true;
-
-		}
-
-		TregexPattern pat = TregexPattern.compile("@SBARQ");
-		TregexMatcher matcher = pat.matcher(tree);
-		Tree subtree = tree;
-		if (matcher.find()) {
-			hasSBARQ = true;
-			subtree = matcher.getMatch();
-		}
-		pat = TregexPattern.compile("@SQ");
-		matcher = pat.matcher(subtree);
-		if (matcher.find()) {
-			hasSQ = true;
-		}
-
-		pat = TregexPattern.compile("@WHNP");
-		matcher = pat.matcher(subtree);
-		if (matcher.find()) {
-			subtree = matcher.getMatch();
-			hasWHNP = true;
-		}
-
-		int x = 1;
-		x++;
-
-		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
-
-		// create a grammatical structure object using language pack
-		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(tree);
-
-		// get typed dependencies
-		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
-
-		for (TypedDependency td : typedDeps) {
-
-			if (td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_SUBJECT.toString())
-					|| td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_PASSIVE_SUBJECT.toString())) {
-				hasNSUBJ = true;
-
-			}
-			// if there is a coordinating conjunction it cannot be a simple
-			// sentence
-			if (td.reln().toString().equals(EnglishGrammaticalRelations.COORDINATION.toString())) {
-				return false;
-			}
-
-			if (td.reln().toString().equals(EnglishGrammaticalRelations.COPULA.toString())) {
-				isCopular = true;
-			}
-
-			if (td.reln().toString().equals(EnglishGrammaticalRelations.DIRECT_OBJECT.toString())) {
-
-			}
-
-			if (td.reln().toString().contains("root")) {
-				hasRoot = true;
-			}
-			// ??
-			if (td.reln().toString().equals("punct")) {
-
-			}
-		}
-
-		if (isQuestion && hasNSUBJ && hasRoot) {
-			return true;
-		}
-
-		// nested if stuff
-
-		return false;
-
-	}
-
-	/**
-	 * Returns true if the sentence is a fragment clause
-	 * 
-	 * @param sentence
-	 * @return
-	 */
-	public Boolean isFragment(CoreMap sentence) {
-		// Has no full independent clause
-		// May have subject
-		return false;
 	}
 
 	public static Boolean isSimple(Tree tree) {
@@ -582,7 +480,9 @@ public class SentenceAnalyzer {
 
 		pat = TregexPattern.compile("@S");
 		if (matcher.find()) {
-			hasNominalSubject = true;
+			if (!matcher.findNextMatchingNode()) {
+				hasNominalSubject = true;
+			}
 		}
 		if (hasRoot) {
 			if (hasNominalSubject) {
@@ -593,6 +493,101 @@ public class SentenceAnalyzer {
 				}
 			}
 		}
+
+		return false;
+
+	}
+
+	private static boolean isSimpleQuestion(Tree tree) {
+		// TODO Auto-generated method stub
+		boolean isWHQuestion = false;
+		boolean isOtherQuestion = false;
+		boolean hasSBARQ = false;
+		boolean hasWHNP = false;
+		boolean isCopular = false;
+		// Nominal Subject
+		boolean hasNSUBJ = false;
+		boolean hasRoot = false;
+		boolean isQuestion = false;
+
+		// SQ - Inverted yes/no question, or main clause of a wh-question,
+		// following the wh-phrase in SBARQ.
+		boolean hasSQ = false;
+
+		if (tree.getLeaves().toString().contains("?")) {
+			isQuestion = true;
+
+		} else {
+			return false;
+		}
+
+		TregexPattern pat = TregexPattern.compile("@SBARQ");
+		TregexMatcher matcher = pat.matcher(tree);
+		Tree subtree = tree;
+		if (matcher.find()) {
+			hasSBARQ = true;
+			subtree = matcher.getMatch();
+		}
+		// can indicate an inverted yes/no question or clause to SBARQ WHNP
+		pat = TregexPattern.compile("@SQ");
+		matcher = pat.matcher(subtree);
+		if (matcher.find()) {
+			hasSQ = true;
+		}
+
+		pat = TregexPattern.compile("@WHNP");
+		matcher = pat.matcher(subtree);
+		if (matcher.find()) {
+			subtree = matcher.getMatch();
+			hasWHNP = true;
+		}
+
+		int x = 1;
+		x++;
+
+		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
+
+		// create a grammatical structure object using language pack
+		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(tree);
+
+		// get typed dependencies
+		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
+
+		for (TypedDependency td : typedDeps) {
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_SUBJECT.toString())
+					|| td.reln().toString().equals(EnglishGrammaticalRelations.NOMINAL_PASSIVE_SUBJECT.toString())) {
+				hasNSUBJ = true;
+
+			}
+			// if there is a coordinating conjunction it cannot be a simple
+			// sentence
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.COORDINATION.toString())) {
+				return false;
+			}
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.COPULA.toString())) {
+				isCopular = true;
+			}
+
+			if (td.reln().toString().equals(EnglishGrammaticalRelations.DIRECT_OBJECT.toString())) {
+
+			}
+
+			if (td.reln().toString().contains("root")) {
+				hasRoot = true;
+			}
+			// ??
+			if (td.reln().toString().equals("punct")) {
+
+			}
+		}
+
+		if (isQuestion && hasNSUBJ && hasRoot && hasSQ) {
+			return true;
+		}
+
+		// nested if stuff
 
 		return false;
 
