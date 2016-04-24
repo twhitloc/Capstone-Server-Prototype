@@ -15,8 +15,194 @@ public class ClauseTransformer {
 
 	private static String toBeVerbs = "is are were am be been being";
 
+	private static int findIndexedWordNodeNumber(Tree tree, IndexedWord word) {
+		String indexedWordValue = word.value();
+		int index = 0;
+		for (Tree t : tree) {
+			if (t.firstChild() != null) {
+				if (t.firstChild().value().toString().contains(indexedWordValue)) {
+					index = t.nodeNumber(tree);
+					break;
+				}
+			}
+		}
+		return index;
+	}
+
+	private static String manipulateDependencies(Tree sentence, String translation) {
+
+		Boolean isCopulaPhrase = false;
+		//
+		int numSubjects = 0;
+
+		String words[] = translation.split(" ");
+
+		IndexedWord nominalSubjectActor = new IndexedWord();
+		IndexedWord nominalSubjectAction = new IndexedWord();
+		IndexedWord rootVerb = new IndexedWord();
+		IndexedWord indirectObject = new IndexedWord();
+		IndexedWord directObject = new IndexedWord();
+		IndexedWord determiner = new IndexedWord();
+
+		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
+		// create a grammatical structure object using language pack
+		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(sentence);
+		// find head dependency for the tree
+
+		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
+		System.out.println("typedDeps ==>  " + typedDeps);
+
+		for (TypedDependency td : typedDeps) {
+
+			IndexedWord dependent = td.dep();
+			IndexedWord governor = td.gov();
+			String depStr = dependent.toString();
+			String govStr = governor.toString();
+
+			for (String w : words) {
+
+				if (depStr.contains(w)) {
+					translation = translation.replace(w, dependent.lemma().toString());
+				} else if (govStr.contains(w)) {
+					translation = translation.replace(w, governor.lemma().toString());
+				}
+			}
+
+			switch (td.reln().toString()) {
+
+			// Nominal Subject
+			case "nsubj":
+
+				nominalSubjectActor = dependent;
+				nominalSubjectAction = governor;
+				break;
+
+			// Sentence Root
+			case "root":
+				// rootVerb = dependent;
+				break;
+
+			// Determiner
+			case "det":
+				if (dependent.toString().contains("a") || dependent.toString().contains("an")
+						|| dependent.toString().contains("the") && sentence.getLeaves().size() < 5) {
+					// rootVerb = null;
+					// for now just ignore the articles
+					// RootVerb may be wrong in this case?
+				} else {
+					determiner = dependent;
+				}
+				break;
+
+			// Indirect Object
+			case "iobj":
+				indirectObject = dependent;
+				break;
+			// Direct Object
+			case "dobj":
+				directObject = dependent;
+				break;
+
+			// Copula
+			case "cop":
+				isCopulaPhrase = true;
+				directObject = governor;
+				break;
+			default:
+				break;
+			}
+		}
+		return translation;
+	}
+
+	private static String removeSpaceBeforePunctuation(String translation) {
+		translation = translation.replace(" .", ".");
+		translation = translation.replace(" ?", " questioning");
+		translation = translation.replace(" !", "!");
+		translation = translation.replace(" ,", ",");
+		translation = translation.replace(" ;", ";");
+		translation = translation.replace(" -", "-");
+		translation = translation.replace(" '", "'");
+		return translation;
+	}
+
+	private static Tree removeToBeVerbs(Tree vP) {
+
+		for (Tree v : vP) {
+			if (v.label().value().contains("VB") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.remove(v);
+					parent.removeChild(index);
+
+				}
+			} else if (v.label().value().contains("VBZ") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.removeChild(index);
+				}
+			} else if (v.label().value().contains("VBD") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.removeChild(index);
+
+				}
+			} else if (v.label().value().contains("VBN") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.removeChild(index);
+
+				}
+			} else if (v.label().value().contains("VBG") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.removeChild(index);
+
+				}
+			} else if (v.label().value().contains("VBP") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
+				Tree parent = v.parent(vP);
+				int index = v.nodeNumber(parent);
+				if (index >= 0) {
+					parent.removeChild(index);
+				}
+			}
+		}
+		return vP;
+
+	}
+
+	private static Tree replaceNode(Tree temp, Tree newTree, Tree sentence, TregexPattern pat) {
+		// TODO Auto-generated method stub
+
+		TregexMatcher matcher = pat.matcher(sentence);
+		Tree parent = temp.parent(sentence);
+		int index = parent.objectIndexOf(temp);
+		if (index >= 0) {
+			parent.setChild(index, temp);
+		}
+		while (parent != sentence) {
+			Tree t = parent;
+			parent = t.parent(sentence);
+			index = parent.objectIndexOf(t);
+			if (index >= 0) {
+				parent.setChild(index, t);
+			}
+			if (parent == sentence) {
+				sentence = parent;
+			}
+		}
+
+		return sentence;
+	}
+
 	static String simpleQuestionTransformation(Tree sentence) {
 
+		Tree temp, newTree;
 		String translation = "";
 		boolean isQuestion = false;
 
@@ -25,46 +211,77 @@ public class ClauseTransformer {
 			isQuestion = true;
 		}
 
-		ArrayList<Tree> nounPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "NP");
-		ArrayList<Tree> verbPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "VP");
-		ArrayList<Tree> sqPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SQ");
-		ArrayList<Tree> WHNPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "WHNP");
-		ArrayList<Tree> SBARPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBAR");
-		ArrayList<Tree> SBARQPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBARQ");
-
 		TregexPattern pat;
-		TregexMatcher matcher;
 
+		ArrayList<Tree> nounPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "NP");
 		if (nounPhrases.size() != 0) {
 			for (int i = nounPhrases.size() - 1; i >= 0; i--) {
-				Tree temp = nounPhrases.get(i);
-				int nodePosition = temp.nodeNumber(sentence);
-				Tree newTree = transformNounPhrase(temp);
+				temp = nounPhrases.get(i);
+				newTree = transformNounPhrase(temp);
 				pat = TregexPattern.compile("@NP");
 				sentence = replaceNode(temp, newTree, sentence, pat);
-
 			}
 		}
 
+		ArrayList<Tree> sqPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SQ");
 		if (sqPhrases.size() > 0) {
 			// Since SQ can represent inverted Are questions (yes/no answerable)
 			// We know that this is technically a VP so transform it accordingly
 			for (int i = sqPhrases.size() - 1; i >= 0; i--) {
-				Tree temp = sqPhrases.get(i);
-				int nodePosition = temp.nodeNumber(sentence);
-				Tree newTree = transformVerbPhrase(temp);
+				temp = sqPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
 				pat = TregexPattern.compile("@SQ");
 				sentence = replaceNode(temp, newTree, sentence, pat);
 			}
 		}
 
+		ArrayList<Tree> WHNPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "WHNP");
 		if (WHNPhrases.size() > 0) {
 			// Since SQ can represent inverted Are questions (yes/no answerable)
 			// We know that this is technically a VP so transform it accordingly
 			for (int i = WHNPhrases.size() - 1; i >= 0; i--) {
-				Tree temp = WHNPhrases.get(i);
-				int nodePosition = temp.nodeNumber(sentence);
-				sentence = transformWHNPQuestion(temp, sentence);
+				temp = WHNPhrases.get(i);
+				newTree = transformWHNPQuestion(temp, sentence);
+				pat = TregexPattern.compile("@WHNP");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+			}
+		}
+
+		ArrayList<Tree> verbPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "VP");
+		if (verbPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = verbPhrases.size() - 1; i >= 0; i--) {
+				temp = verbPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
+				pat = TregexPattern.compile("@VP");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+
+			}
+		}
+
+		ArrayList<Tree> SBARPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBAR");
+		if (SBARPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = SBARPhrases.size() - 1; i >= 0; i--) {
+				temp = SBARPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
+				pat = TregexPattern.compile("@SBAR");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+
+			}
+		}
+
+		ArrayList<Tree> SBARQPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBARQ");
+		if (SBARQPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = SBARQPhrases.size() - 1; i >= 0; i--) {
+				temp = SBARQPhrases.get(i);
+				newTree = transformSBARQPhrase(temp, sentence);
+				pat = TregexPattern.compile("@SBARQ");
+				sentence = replaceNode(temp, newTree, sentence, pat);
 
 			}
 		}
@@ -72,27 +289,205 @@ public class ClauseTransformer {
 		List<Tree> list = sentence.getLeaves();
 		int i = 0;
 		for (Tree t : list) {
-			if (!toBeVerbs.contains(t.value().toString())) {
-
+			if (!toBeVerbs.contains(t.value().toString().toLowerCase()) || t.value().toUpperCase().equals("I")) {
 				if (i < list.size() - 1) {
 					translation += t.value() + " ";
 				} else {
-					if (!t.value().toString().contains("?")) {
-						translation += t.value();
-					} else {
-						translation += "questioning";
-					}
+					translation += t.value();
 				}
 			}
 			i++;
 		}
+		translation = removeSpaceBeforePunctuation(translation);
 
 		// get the language pack
 
 		// SemanticGraph collDeps =
 		// sentence.get(CollapsedDependenciesAnnotation.class);
 
-		return translation;
+		return translation.trim();
+	}
+
+	static String simpleSentenceTransformation(Tree sentence) {
+		String translation = "";
+		Tree temp, newTree;
+		//
+		TregexPattern pat;
+
+		ArrayList<Tree> nounPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "NP");
+		ArrayList<Tree> verbPhrases = new ArrayList<Tree>();
+		if (nounPhrases.size() != 0) {
+			for (int i = nounPhrases.size() - 1; i >= 0; i--) {
+				temp = nounPhrases.get(i);
+				newTree = transformNounPhrase(temp);
+				pat = TregexPattern.compile("@NP");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+
+			}
+		}
+		verbPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "VP");
+		if (verbPhrases.size() != 0) {
+			for (int i = verbPhrases.size() - 1; i >= 0; i--) {
+				temp = verbPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
+				pat = TregexPattern.compile("@VP");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+			}
+		}
+
+		ArrayList<Tree> SBARPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBAR");
+		if (SBARPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = SBARPhrases.size() - 1; i >= 0; i--) {
+				temp = SBARPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
+				pat = TregexPattern.compile("@SBAR");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+			}
+		}
+
+		ArrayList<Tree> SBARQPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SBARQ");
+		if (SBARQPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = SBARQPhrases.size() - 1; i >= 0; i--) {
+				temp = SBARQPhrases.get(i);
+				newTree = transformSBARQPhrase(temp, sentence);
+				pat = TregexPattern.compile("@SBARQ");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+			}
+		}
+
+		ArrayList<Tree> sqPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "SQ");
+		if (sqPhrases.size() > 0) {
+			// Since SQ can represent inverted Are questions (yes/no answerable)
+			// We know that this is technically a VP so transform it accordingly
+			for (int i = sqPhrases.size() - 1; i >= 0; i--) {
+				temp = sqPhrases.get(i);
+				newTree = transformVerbPhrase(temp);
+				pat = TregexPattern.compile("@SQ");
+				sentence = replaceNode(temp, newTree, sentence, pat);
+			}
+		}
+
+		List<Tree> list = sentence.getLeaves();
+		int i = 0;
+		for (Tree t : list) {
+			if (!toBeVerbs.contains(t.value().toString().toLowerCase()) || t.value().toUpperCase().equals("I")) {
+				if (i++ < list.size() - 1) {
+					translation += t.value() + " ";
+				} else {
+					translation += t.value();
+				}
+			}
+		}
+		translation = removeSpaceBeforePunctuation(translation);
+
+		translation = manipulateDependencies(sentence, translation);
+
+		// get the language pack
+
+		// SemanticGraph collDeps =
+		// sentence.get(CollapsedDependenciesAnnotation.class);
+
+		return translation.trim();
+	}
+
+	private static Tree swapChildSubTrees(Tree target, int indexA, int indexB) {
+		int maxIndex = target.children().length;
+		Tree a = null, b = null;
+		if (indexA < maxIndex && indexB < maxIndex) {
+			a = target.getChild(indexA);
+			b = target.getChild(indexB);
+			target.setChild(indexA, b);
+			target.setChild(indexB, a);
+
+		} else {
+			Tree parentA = null;
+			Tree parentB = null;
+			// if the nodes are contained inside the children Trees passed,
+			// change the parents of these nodes
+			// So, if NP is the parent, that needs to get moved where the child
+			// goes
+			if (target.children().length == 1 && target.label().toString().contains("ROOT")) {
+				target = target.firstChild();
+			}
+
+			Tree[] children = target.children();
+			a = target.getNodeNumber(indexA);
+			b = target.getNodeNumber(indexB);
+
+			for (Tree child : children) {
+				if (parentB != null && parentA != null) {
+					break;
+				}
+				if (child.contains(a)) {
+					parentA = child;
+					indexA = target.objectIndexOf(parentA);
+				}
+				if (child.contains(b)) {
+					parentB = child;
+					indexB = target.objectIndexOf(parentB);
+				}
+			}
+			if (parentB != null && parentA != null) {
+				target.setChild(indexA, parentB);
+				target.setChild(indexB, parentA);
+			}
+
+		}
+		return target;
+	}
+
+	private static Tree swapChildSubTrees(Tree target, int directDep, int indirectObj, int directObj) {
+		int maxIndex = target.children().length;
+		Tree dep = null, indir = null, dir = null;
+		if (directDep < maxIndex && indirectObj < maxIndex && directObj < maxIndex) {
+			dep = target.getChild(directDep);
+			indir = target.getChild(indirectObj);
+			dir = target.getChild(directObj);
+			target.setChild(directDep, indir);
+			target.setChild(indirectObj, dir);
+			target.setChild(directObj, dep);
+
+		} else {
+			Tree parentDep = null;
+			Tree parentIn = null;
+			Tree parentDir = null;
+			// if the nodes are contained inside the children Trees passed,
+			// change the parents of these nodes
+			// So, if NP is the parent, that needs to get moved where the child
+			// goes
+			if (target.children().length == 1 && target.label().toString().contains("ROOT")) {
+				target = target.firstChild();
+			}
+
+			Tree[] children = target.children();
+			dep = target.getNodeNumber(directDep);
+			indir = target.getNodeNumber(indirectObj);
+			dir = target.getNodeNumber(directObj);
+
+			for (Tree child : children) {
+				if (child.contains(dep)) {
+					parentDep = child;
+					directDep = target.objectIndexOf(parentDep);
+				} else if (child.contains(indir)) {
+					parentIn = child;
+					indirectObj = target.objectIndexOf(parentIn);
+				} else if (child.contains(dir)) {
+					parentDir = child;
+					directObj = target.objectIndexOf(parentDir);
+				}
+			}
+			if (parentDep != null && parentIn != null && parentDir != null) {
+				target.setChild(directDep, parentIn);
+				target.setChild(indirectObj, parentDir);
+				target.setChild(directObj, parentDep);
+			}
+
+		}
+		return target;
 	}
 
 	public static Tree transformNounPhrase(Tree nP) {
@@ -127,32 +522,8 @@ public class ClauseTransformer {
 
 	}
 
-	public static Tree transformWHNPQuestion(Tree wP, Tree sentence) {
-		if (wP.size() == 1) {
-			TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
-			// create a grammatical structure object using language pack
-			GrammaticalStructure structure = languagePack.grammaticalStructureFactory()
-					.newGrammaticalStructure(sentence);
-
-			Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
-			System.out.println("typedDeps ==>  " + typedDeps);
-			Tree[] children = wP.children();
-			IndexedWord questWord = null;
-
-			TregexPattern pat = TregexPattern.compile("@SQ");
-			TregexMatcher matcher = pat.matcher(sentence);
-			if (matcher.find()) {
-				Tree sq = matcher.getMatch();
-				int indexSQ = sq.nodeNumber(sentence);
-				int indexWH = wP.nodeNumber(sentence);
-				sentence = swapChildSubTrees(sentence, indexSQ, indexWH);
-			}
-		}
-		return sentence;
-	}
-
-	public static Tree transformSBARQQuestion(Tree sbqP, Tree sentence) {
-		if (sbqP.size() == 1) {
+	public static Tree transformSBARQPhrase(Tree sbqP, Tree sentence) {
+		if (sbqP.size() > 0) {
 			TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
 			// create a grammatical structure object using language pack
 			GrammaticalStructure structure = languagePack.grammaticalStructureFactory()
@@ -163,13 +534,15 @@ public class ClauseTransformer {
 			Tree[] children = sbqP.children();
 			IndexedWord questWord = null;
 
-			TregexPattern pat = TregexPattern.compile("@SQ");
+			TregexPattern pat = TregexPattern.compile("@WP");
 			TregexMatcher matcher = pat.matcher(sentence);
 			if (matcher.find()) {
-				Tree sq = matcher.getMatch();
-				int indexSQ = sq.nodeNumber(sentence);
-				int indexWH = sbqP.nodeNumber(sentence);
-				sentence = swapChildSubTrees(sentence, indexSQ, indexWH);
+				Tree whnp = matcher.getMatch();
+				int indexWH = whnp.nodeNumber(sentence);
+				int indexSQ = sbqP.nodeNumber(sentence);
+				if (indexSQ > indexWH) {
+					sentence = swapChildSubTrees(sentence, indexSQ, indexWH);
+				}
 			}
 		}
 		return sentence;
@@ -299,366 +672,25 @@ public class ClauseTransformer {
 
 	}
 
-	private static int findIndexedWordNodeNumber(Tree tree, IndexedWord word) {
-		String indexedWordValue = word.value();
-		int index = 0;
-		for (Tree t : tree) {
-			if (t.firstChild() != null) {
-				if (t.firstChild().value().toString().contains(indexedWordValue)) {
-					index = t.nodeNumber(tree);
-					break;
-				}
-			}
-		}
-		return index;
-	}
-
-	private static Tree swapChildSubTrees(Tree target, int directDep, int indirectObj, int directObj) {
-		int maxIndex = target.children().length;
-		Tree dep = null, indir = null, dir = null;
-		if (directDep < maxIndex && indirectObj < maxIndex && directObj < maxIndex) {
-			dep = target.getChild(directDep);
-			indir = target.getChild(indirectObj);
-			dir = target.getChild(directObj);
-			target.setChild(directDep, indir);
-			target.setChild(indirectObj, dir);
-			target.setChild(directObj, dep);
-
-		} else {
-			Tree parentDep = null;
-			Tree parentIn = null;
-			Tree parentDir = null;
-			// if the nodes are contained inside the children Trees passed,
-			// change the parents of these nodes
-			// So, if NP is the parent, that needs to get moved where the child
-			// goes
-			Tree[] children = target.children();
-			dep = target.getNodeNumber(directDep);
-			indir = target.getNodeNumber(indirectObj);
-			dir = target.getNodeNumber(directObj);
-
-			for (Tree child : children) {
-				if (child.contains(dep)) {
-					parentDep = child;
-					directDep = target.objectIndexOf(parentDep);
-				} else if (child.contains(indir)) {
-					parentIn = child;
-					indirectObj = target.objectIndexOf(parentIn);
-				} else if (child.contains(dir)) {
-					parentDir = child;
-					directObj = target.objectIndexOf(parentDir);
-				}
-			}
-			if (parentDep != null && parentIn != null && parentDir != null) {
-				target.setChild(directDep, parentIn);
-				target.setChild(indirectObj, parentDir);
-				target.setChild(directObj, parentDep);
-			}
-
-		}
-		return target;
-	}
-
-	private static Tree swapChildSubTrees(Tree target, int indexA, int indexB) {
-		int maxIndex = target.children().length;
-		Tree a = null, b = null;
-		if (indexA < maxIndex && indexB < maxIndex) {
-			a = target.getChild(indexA);
-			b = target.getChild(indexB);
-			target.setChild(indexA, b);
-			target.setChild(indexB, a);
-
-		} else {
-			Tree parentA = null;
-			Tree parentB = null;
-			// if the nodes are contained inside the children Trees passed,
-			// change the parents of these nodes
-			// So, if NP is the parent, that needs to get moved where the child
-			// goes
-			Tree[] children = target.children();
-			a = target.getNodeNumber(indexA);
-			b = target.getNodeNumber(indexB);
-
-			for (Tree child : children) {
-				if (child.contains(a)) {
-					parentA = child;
-					indexA = target.objectIndexOf(parentA);
-				} else if (child.contains(b)) {
-					parentB = child;
-					indexB = target.objectIndexOf(parentB);
-				}
-			}
-			if (parentB != null && parentA != null) {
-				target.setChild(indexA, parentB);
-				target.setChild(indexB, parentA);
-			}
-
-		}
-		return target;
-	}
-
-	private static Tree removeToBeVerbs(Tree vP) {
-
-		for (Tree v : vP) {
-			if (v.label().value().contains("VB") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.remove(v);
-					parent.removeChild(index);
-
-				}
-			} else if (v.label().value().contains("VBZ") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.removeChild(index);
-				}
-			} else if (v.label().value().contains("VBD") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.removeChild(index);
-
-				}
-			} else if (v.label().value().contains("VBN") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.removeChild(index);
-
-				}
-			} else if (v.label().value().contains("VBG") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.removeChild(index);
-
-				}
-			} else if (v.label().value().contains("VBP") && toBeVerbs.contains(v.firstChild().value().toLowerCase())) {
-				Tree parent = v.parent(vP);
-				int index = v.nodeNumber(parent);
-				if (index >= 0) {
-					parent.removeChild(index);
-				}
-			}
-		}
-		return vP;
-
-	}
-
-	static String simpleSentenceTransformation(Tree sentence) {
-		String translation = "";
-		//
-
-		ArrayList<Tree> nounPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "NP");
-		ArrayList<Tree> verbPhrases = new ArrayList<Tree>();
-		if (nounPhrases.size() != 0) {
-			for (int i = nounPhrases.size() - 1; i >= 0; i--) {
-				Tree temp = nounPhrases.get(i);
-				int nodePosition = temp.nodeNumber(sentence);
-				Tree newTree = transformNounPhrase(temp);
-				TregexPattern pat = TregexPattern.compile("@NP");
-				sentence = replaceNode(temp, newTree, sentence, pat);
-
-			}
-		}
-		verbPhrases = SentenceAnalyzer.getPhraseListByTag(sentence, "VP");
-		if (verbPhrases.size() != 0) {
-			for (int i = verbPhrases.size() - 1; i >= 0; i--) {
-				Tree temp = verbPhrases.get(i);
-				int nodePosition = temp.nodeNumber(sentence);
-				Tree newTree = transformVerbPhrase(temp);
-				TregexPattern pat = TregexPattern.compile("@VP");
-				sentence = replaceNode(temp, newTree, sentence, pat);
-			}
-		}
-
-		List<Tree> list = sentence.getLeaves();
-		int i = 0;
-		for (Tree t : list) {
-			if (!toBeVerbs.contains(t.value().toString())) {
-				if (i++ < list.size() - 1) {
-					translation += t.value() + " ";
-				} else {
-					translation += t.value();
-				}
-			}
-		}
-		translation = removeSpaceBeforePunctuation(translation);
-
-		translation = manipulateDependencies(sentence, translation);
-
-		// get the language pack
-
-		// SemanticGraph collDeps =
-		// sentence.get(CollapsedDependenciesAnnotation.class);
-
-		return translation;
-	}
-
-	private static String manipulateDependencies(Tree sentence, String translation) {
-
-		Boolean isCopulaPhrase = false;
-		//
-		int numSubjects = 0;
-
-		String words[] = translation.split(" ");
-
-		IndexedWord nominalSubjectActor = new IndexedWord();
-		IndexedWord nominalSubjectAction = new IndexedWord();
-		IndexedWord rootVerb = new IndexedWord();
-		IndexedWord indirectObject = new IndexedWord();
-		IndexedWord directObject = new IndexedWord();
-		IndexedWord determiner = new IndexedWord();
+	public static Tree transformWHNPQuestion(Tree wP, Tree sentence) {
 
 		TreebankLanguagePack languagePack = new PennTreebankLanguagePack();
 		// create a grammatical structure object using language pack
 		GrammaticalStructure structure = languagePack.grammaticalStructureFactory().newGrammaticalStructure(sentence);
-		// find head dependency for the tree
 
 		Collection<TypedDependency> typedDeps = structure.typedDependenciesCollapsed();
 		System.out.println("typedDeps ==>  " + typedDeps);
+		Tree[] children = wP.children();
+		IndexedWord questWord = null;
 
-		for (TypedDependency td : typedDeps) {
-
-			IndexedWord dependent = td.dep();
-			IndexedWord governor = td.gov();
-			String depStr = dependent.toString();
-			String govStr = governor.toString();
-
-			for (String w : words) {
-
-				if (depStr.contains(w)) {
-					translation = translation.replace(w, dependent.lemma().toString());
-				} else if (govStr.contains(w)) {
-					translation = translation.replace(w, governor.lemma().toString());
-				}
-			}
-
-			switch (td.reln().toString()) {
-
-			// Nominal Subject
-			case "nsubj":
-
-				nominalSubjectActor = dependent;
-				nominalSubjectAction = governor;
-				break;
-
-			// Sentence Root
-			case "root":
-				// rootVerb = dependent;
-				break;
-
-			// Determiner
-			case "det":
-				if (dependent.toString().contains("a") || dependent.toString().contains("an")
-						|| dependent.toString().contains("the") && sentence.getLeaves().size() < 5) {
-					// rootVerb = null;
-					// for now just ignore the articles
-					// RootVerb may be wrong in this case?
-				} else {
-					determiner = dependent;
-				}
-				break;
-
-			// Indirect Object
-			case "iobj":
-				indirectObject = dependent;
-				break;
-			// Direct Object
-			case "dobj":
-				directObject = dependent;
-				break;
-
-			// Copula
-			case "cop":
-				isCopulaPhrase = true;
-				directObject = governor;
-				break;
-			default:
-				break;
-			}
-		}
-		return translation;
-	}
-
-	private static String removeSpaceBeforePunctuation(String translation) {
-		translation = translation.replace(" .", ".");
-		translation = translation.replace(" ?", "?");
-		translation = translation.replace(" !", "!");
-		translation = translation.replace(" ,", ",");
-		translation = translation.replace(" ;", ";");
-		translation = translation.replace(" -", "-");
-		translation = translation.replace(" '", "'");
-		return translation;
-	}
-
-	private static Tree replaceNode(Tree temp, Tree newTree, Tree sentence, TregexPattern pat) {
-		// TODO Auto-generated method stub
-
+		TregexPattern pat = TregexPattern.compile("@SQ");
 		TregexMatcher matcher = pat.matcher(sentence);
-		Tree parent = temp.parent(sentence);
-		int index = parent.objectIndexOf(temp);
-		if (index >= 0) {
-			parent.setChild(index, temp);
+		if (matcher.find()) {
+			Tree sq = matcher.getMatch();
+			int indexSQ = sq.nodeNumber(sentence);
+			int indexWH = wP.firstChild().nodeNumber(sentence);
+			sentence = swapChildSubTrees(sentence, indexSQ, indexWH);
 		}
-		while (parent != sentence) {
-			Tree t = parent;
-			parent = t.parent(sentence);
-			index = parent.objectIndexOf(t);
-			if (index >= 0) {
-				parent.setChild(index, t);
-			}
-			if (parent == sentence) {
-				sentence = parent;
-			}
-		}
-
 		return sentence;
 	}
-
-	/**
-	 * // if the sentence is a declaration statement * ie : "I am a student" if
-	 * (isCopulaPhrase == true && nominalSubjectActor.size() != 0 &&
-	 * directObject.size() != 0) {
-	 * 
-	 * translation = nominalSubjectActor.lemma().toString() + " " +
-	 * directObject.lemma().toString();
-	 * 
-	 * // If there is an indirect object and direct object } else if
-	 * (nominalSubjectActor.size() != 0 && indirectObject.size() != 0 &&
-	 * directObject.size() != 0 && nominalSubjectAction.size() != 0) {
-	 * 
-	 * translation = nominalSubjectActor.lemma().toString() + " " +
-	 * indirectObject.lemma().toString() + " " + directObject.lemma().toString()
-	 * + " " + nominalSubjectAction.lemma().toString();
-	 * 
-	 * // if there is a direct object without an indirect object } else if
-	 * (nominalSubjectActor.size() != 0 && directObject.size() != 0 &&
-	 * nominalSubjectAction.size() != 0) { translation =
-	 * nominalSubjectActor.lemma().toString() + " " +
-	 * nominalSubjectAction.lemma().toString() + " " +
-	 * directObject.lemma().toString(); }
-	 * 
-	 * 
-	 * 
-	 * 
-	 * TregexPattern pat = TregexPattern.compile("@VBZ"); TregexMatcher matcher
-	 * = pat.matcher(vP); if (matcher.find()) { Tree match = matcher.getMatch();
-	 * Tree child = match.firstChild(); if
-	 * (toBeVerbs.contains(child.value().toLowerCase())) { int index =
-	 * vP.objectIndexOf(match); if (index >= 0) { if (index >= 1) { if
-	 * (vP.getNodeNumber(index - 1).label().value().contains("VP")) {
-	 * 
-	 * vP.removeChild(index - 1); } } vP.removeChild(index); } } } TregexPattern
-	 * pat = TregexPattern.compile("@VBP"); TregexMatcher matcher =
-	 * pat.matcher(vP); if (matcher.find()) { Tree match = matcher.getMatch();
-	 * Tree child = match.firstChild(); if
-	 * (toBeVerbs.contains(child.value().toLowerCase())) { int index =
-	 * vP.objectIndexOf(match); if (index >= 0) { if (index >= 1) { if
-	 * (vP.getNodeNumber(index - 1).label().value().contains("VP")) {
-	 * 
-	 * vP.removeChild(index - 1); } } vP.removeChild(index); } } }
-	 */
 }

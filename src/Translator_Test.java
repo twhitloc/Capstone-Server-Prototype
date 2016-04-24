@@ -73,7 +73,7 @@ public class Translator_Test {
 
 		String input = "What is your name?";
 		String output = translator.translate(input);
-		assertEquals("you name what questioning", output.toLowerCase());
+		assertEquals("your name what questioning", output.toLowerCase());
 
 	}
 
