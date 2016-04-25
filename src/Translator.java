@@ -63,21 +63,17 @@ public class Translator {
 	 */
 	public void createTranslation() {
 
-		Annotation annotation;
-		annotation = new Annotation(inputString);
-		pipeline.annotate(annotation);
+		String translatedString = translate(inputString);
 
 		PrintWriter srvout;
 		srvout = new PrintWriter(System.out);
 
-		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
-		ArrayList<String> lemmas = getLemmasFromCoreMap(sentences);
-		ArrayList<Sign> matchSigns = getSignListFromLemmas(lemmas);
+		ArrayList<Sign> matchSigns = getSignListFromLemmas(translatedString);
 
+		Annotation annotation;
+		annotation = new Annotation(translatedString);
+		pipeline.annotate(annotation);
 		pipeline.prettyPrint(annotation, srvout);
-
-		// @TODO this is not correct!
-		translatedString = lemmas.toString();
 
 		responseList = matchSigns;
 	}
@@ -154,24 +150,25 @@ public class Translator {
 			switch (sentenceType) {
 
 			case "complex":
-				response = "complex";
+				response = ClauseTransformer.simpleSentenceTransformation(sentence);
 				break;
 			case "fragment":
-				response = "fragment";
+				response = ClauseTransformer.simpleSentenceTransformation(sentence);
 				break;
 			case "simple":
 				response = ClauseTransformer.simpleSentenceTransformation(sentence);
 				break;
 			case "compound":
-				response = "compound";
+				response = ClauseTransformer.simpleSentenceTransformation(sentence);
 				break;
 			case "simpleQuestion":
 				response = ClauseTransformer.simpleQuestionTransformation(sentence);
-
+				break;
+			default:
+				response = ClauseTransformer.simpleSentenceTransformation(sentence);
 				break;
 			}
 		}
-		lemmas = getLemmasFromCoreMap(sentences);
 		return response;
 	}
 
@@ -258,6 +255,19 @@ public class Translator {
 	public ArrayList<Sign> getSignListFromLemmas(List<String> lemmas) {
 		ArrayList<Sign> matchSigns = new ArrayList<Sign>();
 		for (String lemma : lemmas) {
+			if (!lemma.matches(".*[^A-za-z].*")) {
+				if (getSignIfExist(lemma) != null) {
+					matchSigns.add(getSignIfExist(lemma));
+				}
+				// else get the word spelled out
+			}
+		}
+		return matchSigns;
+	}
+
+	public ArrayList<Sign> getSignListFromLemmas(String sentence) {
+		ArrayList<Sign> matchSigns = new ArrayList<Sign>();
+		for (String lemma : sentence.split(" ")) {
 			if (!lemma.matches(".*[^A-za-z].*")) {
 				if (getSignIfExist(lemma) != null) {
 					matchSigns.add(getSignIfExist(lemma));

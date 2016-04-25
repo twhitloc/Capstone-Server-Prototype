@@ -60,11 +60,14 @@ public class ClauseTransformer {
 			String govStr = governor.toString();
 
 			for (String w : words) {
-
-				if (depStr.contains(w)) {
-					translation = translation.replace(w, dependent.lemma().toString());
-				} else if (govStr.contains(w)) {
-					translation = translation.replace(w, governor.lemma().toString());
+				if (depStr != null && govStr != null) {
+					if (depStr.contains(w)) {
+						if (dependent.lemma() != null)
+							translation = translation.replace(w, dependent.lemma().toString());
+					} else if (govStr.contains(w)) {
+						if (governor.lemma() != null)
+							translation = translation.replace(w, governor.lemma().toString());
+					}
 				}
 			}
 

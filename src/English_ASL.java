@@ -132,6 +132,9 @@ public class English_ASL extends HttpServlet {
 			break;
 
 		}
+
+		System.out.println("Server Request Action : " + serverAction + "\n");
+
 		return input.substring(2, input.length());
 	}
 
@@ -177,6 +180,7 @@ public class English_ASL extends HttpServlet {
 
 		// 1: Save Phrase
 		case 1:
+			System.out.println("Save Translation Request \n");
 			input = input.substring(1, input.length() - 1);
 
 			int beginIndex = 0;
@@ -212,11 +216,12 @@ public class English_ASL extends HttpServlet {
 			writeSignsToResponseStream(responseList, responseStream);
 
 			break;
-		// 2: Get Random Sign Information
+		// 2: Get Sign
 		case 2:
 
 			switch (Integer.parseInt(input.substring(0, 2))) {
 			case 1:
+				System.out.println("Get Matching Sign Request \n");
 				// initiate a translator session
 				input = input.substring(2, input.length() - 1);
 				translator.initiateSession(responseStream, input);
@@ -235,7 +240,7 @@ public class English_ASL extends HttpServlet {
 
 				break;
 			case 2:
-
+				System.out.println("Random Sign Request \n");
 				// getRandomSign()
 				// get the list of signs that represent that translation
 				responseList = translator.responseList;
@@ -255,7 +260,7 @@ public class English_ASL extends HttpServlet {
 			break;
 		// 3: Translate Phrase
 		case 3:
-
+			System.out.println("Translation Request \n");
 			// initiate a translator session
 			translator.initiateSession(responseStream, input);
 
@@ -274,6 +279,7 @@ public class English_ASL extends HttpServlet {
 			break;
 
 		case 4:
+			System.out.println("View Saved Translation Request \n");
 			ArrayList<TranslatedPhrase> phrases = new ArrayList<TranslatedPhrase>();
 			int currentNum = Integer.parseInt(input.substring(0, 2));
 			if (currentNum + 10 < savedPhrases.size()) {
